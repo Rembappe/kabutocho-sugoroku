@@ -255,7 +255,6 @@ table{border-collapse:collapse;width:100%}
 .pl.done .st{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .go:disabled{opacity:.5;cursor:wait}
 .go.gold{background:var(--gold);color:#1B1B1B;margin-top:16px}
-.box-hero{text-align:left}
 
 </style>
 </head>
@@ -276,7 +275,7 @@ const FIREBASE_CONFIG={ // Firebaseの公開設定（Webページに載せて使
 /* ===================== 定数とデータ ===================== */
 const DT=1/24;      // 1ターン = 2週間（1ヶ月2ターン）
 const PRE=120;     // ゲーム開始前に作る過去の相場（5年分）
-// ↑ PRE：ゲーム開始前に作る過去の相場（5年分）
+
 const TAX=.20315;   // 株の利益と配当にかかる税金（所得税15.315%＋住民税5%）
 const NISA_LIM={yT:1200000,yS:2400000,life:18000000,lifeS:12000000};
 const HALF=w=>w===1?'前半':'後半';
@@ -764,10 +763,9 @@ async function joinOnline({code,name,pin}){
  const pl=await store.get(plPath(code,id));
  if(pl){if(pl.pin!==h)throw new Error('この名前はもう使われていて、合言葉が違います。自分の名前なら合言葉を確かめて、新しく参加するなら別の名前にしてください。')}
  else{
-   if(room.t>=room.total)throw new Error('このゲームはもう終わっています。');
    const n=Object.keys(room.members||{}).length;
    if(n>=8)throw new Error('この部屋は満員です（8人まで）。');
-   await store.set(plPath(code,id),newPlayer(name,h,room.cash,room.t,n));
+   await store.set(plPath(code,id),newPlayer(name,h,room.cash,0,n));
    await store.update(roomPath(code),{[`members.${id}`]:{name,color:n,bust:false,order:n}});
  }
  remember({code,id,name,pin:h});
@@ -804,10 +802,13 @@ function quit(){leave();ROOM=null;G=null;MODE=null;try{history.replaceState(null
 
 const membersOrdered=()=>Object.entries(ROOM.members||{}).sort((a,b)=>a[1].order-b[1].order).map(([id,m])=>({id,...m}));
 const aliveIds=()=>membersOrdered().filter(m=>!m.bust).map(m=>m.id);
-const isOver=()=>ROOM.t>=ROOM.total||aliveIds().length===0;
+// オンラインは各自のペースで進む（相場は部屋のシードから全員同じものが再現される）。1台モードは全員いっしょに進む
+const isOver=()=>MODE==='online'?!!ME&&(ME.t>=ROOM.total||ME.bust):(ROOM.t>=ROOM.total||aliveIds().length===0);
 
 function onRoom(r){
  if(!r){ui.lobbyMsg='部屋が見つかりませんでした。';quit();return}
+ if(MODE==='online'){const first=!ROOM;ROOM=r;if(!G||G.seed!==r.seed)buildMarket(r.seed);pickMe();
+   if(ME)extendTo(ME.t);if(first||!document.getElementById('bar'))render();else renderBarOnly();return}
  const turnChanged=!ROOM||r.t!==ROOM.t;
  ROOM=r;
  if(!G||G.seed!==r.seed)buildMarket(r.seed);
@@ -826,12 +827,14 @@ function onPlayers(list){
    PLAYERS[id]=data;if(OWNED.includes(id))mineChanged=true;
  }
  if(!ROOM||!G)return;
+ if(MODE==='online'){pickMe();if(!ME)return;if(mineChanged){extendTo(ME.t);ui.seenT=ME.t}
+   if(mineChanged||!document.getElementById('bar'))render();else renderBarOnly();return}
  syncOwned();pickMe();
  if(mineChanged||!document.getElementById('bar'))render();else renderBarOnly();
 }
 // 相場が進んでいたら、自分の口座に配当・積立などを反映して保存
 function syncOwned(){
- if(!ROOM||!G)return;
+ if(!ROOM||!G||MODE==='online')return;
  const T=Math.min(ROOM.t,ROOM.total);
  for(const id of OWNED){const pl=PLAYERS[id];if(!pl)continue;
    if(catchUp(pl,T)){persist(id);if(pl.bust&&!ROOM.members[id]?.bust)STORE.update(roomPath(ROOM.code),{[`members.${id}.bust`]:true}).catch(storeError)}}
@@ -841,7 +844,7 @@ function pickMe(){
  ME=PLAYERS[MEID]||null;
 }
 function maybeAdvance(){
- if(isOver())return;
+ if(MODE==='online'||isOver())return;
  const alive=aliveIds();
  if(alive.length&&alive.every(id=>ROOM.ready[id]))advance(false);
 }
@@ -855,13 +858,21 @@ function advance(force){
  }).catch(storeError);
 }
 function persist(id){const pl=PLAYERS[id];if(pl)STORE.set(plPath(ROOM.code,id),pl).catch(storeError)}
-function endTurn(){if(!ME||ME.bust)return;ui.msg='';ui.qty='';ui.quitArm=false;STORE.update(roomPath(ROOM.code),{[`ready.${MEID}`]:true}).catch(storeError)}
+function endTurn(){
+ if(!ME||ME.bust)return;ui.msg='';ui.qty='';ui.quitArm=false;
+ if(MODE==='online'){
+   if(ME.t>=ROOM.total)return;
+   const T=ME.t+1;extendTo(T);catchUp(ME,T);persist(MEID);
+   ui.seenT=T;ui.extra=curNews().find(isMajor)||null;ui.land=true;ui.lesson=null;
+   render();ui.land=false;window.scrollTo({top:0,behavior:'smooth'});return;
+ }
+ STORE.update(roomPath(ROOM.code),{[`ready.${MEID}`]:true}).catch(storeError)}
 function undoEnd(){STORE.update(roomPath(ROOM.code),{[`ready.${MEID}`]:false}).catch(storeError)}
 
 function trade(side,qty){
  const pl=ME,s=S[ui.sel],a=ui.acct,p=pxJ(s.id),f=feeOf(s,a),k=a+':'+s.id;
  if(!pl||pl.bust)return;
- if(ROOM.ready[MEID])return err('このターンはもう終えています。売買するなら「取り消す」を押してください。');
+ if(MODE==='local'&&ROOM.ready[MEID])return err('このターンはもう終えています。');
  qty=side==='buy'?Math.floor(qty):qty;
  if(!(qty>0))return err('数量を1以上で入れてください');
  if(side==='buy'){
@@ -914,7 +925,7 @@ function renderLobby(){
    ${canOnline?`<div class="seg" role="group" aria-label="参加方法"><button data-lt="join" aria-pressed="${tab==='join'}">部屋に入る</button><button data-lt="make" aria-pressed="${tab==='make'}">部屋を作る</button></div>
    ${tab==='join'?`<p class="desc">誘ってくれた人から部屋コードを聞いて入ろう。2回目以降も、同じ名前と合言葉で自分の口座に戻れる。</p>
     <div class="field"><label for="jc">部屋コード（6文字）</label><input id="jc" class="txt num" maxlength="6" autocomplete="off" value="${esc(hashCode)}"></div>`
-   :`<p class="desc">部屋を作ると部屋コードと招待リンクが出る。それを友達に送ろう。部屋を作った人は、来ない人を待たずにターンを進められる。</p>`}
+   :`<p class="desc">部屋を作ると部屋コードと招待リンクが出る。それを友達に送ろう。全員が同じ相場・同じ事件を体験するけれど、進めるペースは各自の自由。最後の資産で勝負する。</p>`}
     <div class="names"><div class="field"><label for="jn">名前（12文字まで）</label><input id="jn" class="txt" maxlength="12" autocomplete="nickname"></div>
     <div class="field"><label for="jp">合言葉（数字4桁）</label><input id="jp" class="txt num" inputmode="numeric" maxlength="4" autocomplete="off"></div></div>
     ${tab==='make'?opts:''}
@@ -932,7 +943,9 @@ function renderLobby(){
   </div>
   <div class="card rules"><h2>ルール</h2><ul>
    <li>1ターン＝2週間。1ヶ月は前半・後半の2ターン。上のすごろく盤が1年分の暦になっている。</li>
-   <li>売買は何度でもできる。全員が「このターンを終える」を押すと相場が2週間ぶん動き、ニュースが届く。大事件は号外で届く。</li>
+   <li>売買は何度でもできる。「次のターンへ」を押すと相場が2週間ぶん動き、ニュースが届く。大事件は号外で届く。</li>
+   <li>オンラインでは、同じ部屋の全員が同じ相場・同じ事件を体験する。進めるペースは自由で、最後の資産で勝負。先に進んだ人は、この先に起きることを言わないのがマナー。</li>
+   <li>1台で遊ぶときは、全員が売買を終えるとそろって次のターンに進む。</li>
    <li>株価は「会社の利益」×「市場の気分（PER）」で決まる。利益は成長と景気の波で動き、気分は行き過ぎても時間をかけて平均に戻る。</li>
    <li>口座は特定口座とNISA。特定口座では売却益と配当に20.315%の税金がかかり、NISAなら非課税。</li>
    <li>日本株の手数料は0円、米国株は0.45%（NISAなら0円）、金は0.5%。米国株と金はドル建てなので円相場でも損益が変わる。</li>
@@ -975,7 +988,8 @@ function trackHTML(){
    if(d.w===2&&d.m%3===0)b.push(`<span class="bd d" title="配当の権利確定">配</span>`);
    if(d.m===1&&d.w===1)b.push(`<span class="bd n" title="NISAの年間枠リセット">枠</span>`);
    const mk=G.marks[t]&&t<=G.t&&t>0?`<span class="ev ${G.marks[t].mood||''}" title="${esc(G.marks[t].title)}">${esc(G.marks[t].tag)}</span>`:'';
-   const tk=t===G.t?`<span class="tok">${ms.filter(m=>!m.bust).slice(0,6).map(m=>`<i style="background:${COLS[m.color%COLS.length]}" title="${esc(m.name)}">${esc([...m.name][0]||'?')}</i>`).join('')}</span>`:'';
+   const here=MODE==='online'?ms.filter(m=>{const p=m.id===MEID?ME:PLAYERS[m.id];return p&&!p.bust&&Math.min(p.t,ROOM.total)===t}):(t===G.t?ms.filter(m=>!m.bust):[]);
+   const tk=here.length?`<span class="tok">${here.slice(0,6).map(m=>`<i style="background:${COLS[m.color%COLS.length]}" title="${esc(m.name)}">${esc([...m.name][0]||'?')}</i>`).join('')}</span>`:'';
    sq.push(`<li class="sq ${cls} ${t===G.t&&ui.land?'land':''}" aria-current="${t===G.t?'step':'false'}"><span class="mo">${d.m}月</span><span class="hf">${HALF(d.w)}</span><div>${b.join('')}</div>${mk}${tk}</li>`);
  }
  // 前半（1〜6月）を左から右、後半（7〜12月）を右から左へ並べて、すごろくの蛇行にする
@@ -984,8 +998,11 @@ function trackHTML(){
  return `<section class="track" aria-label="今年のすごろく盤"><div class="yrlabel">${dateOf(G.t).y}年のすごろく盤　地上に戻るまであと${ROOM.total-G.t}ターン</div><ol>${order.join('')}</ol>
  <div class="trackleg"><span><b>決</b> 決算シーズン</span><span><b>配</b> 配当の権利確定</span><span><b>枠</b> NISA枠リセット</span><span>マスの下の文字は、そのターンに起きた出来事</span></div></section>`;
 }
+const progress=p=>p.bust?'破産':p.t>=ROOM.total?'完走':`${dstr(p.t)}`;
 function stripHTML(){
  const ms=membersOrdered();if(ms.length<2&&MODE==='local')return '';
+ if(MODE==='online')return ms.map(m=>{const p=m.id===MEID?ME:PLAYERS[m.id];if(!p)return '';const v=m.id===MEID?value(p):p.hist[p.hist.length-1];
+   return `<div class="pl ${m.id===MEID?'on':''} ${p.bust?'bust':''} ${p.t>=ROOM.total?'done':''}"><b><span class="dot" style="background:${COLS[m.color%COLS.length]}"></span>${esc(m.name)}${m.id===MEID?'（あなた）':''}<span class="st">${progress(p)}</span></b><span class="v">${yen(v)}</span> ${pcs(v/p.start-1)}</div>`}).join('');
  return ms.map(m=>{const p=PLAYERS[m.id];const v=p?value(p):ROOM.cash,st=p?p.start:ROOM.cash;
    const status=m.bust?'破産':ROOM.ready[m.id]?'完了':m.id===MEID?(MODE==='local'?'取引中':'あなた'):'取引中';
    return `<div class="pl ${m.id===MEID?'on':''} ${m.bust?'bust':''} ${ROOM.ready[m.id]?'done':''}"><b><span class="dot" style="background:${COLS[m.color%COLS.length]}"></span>${esc(m.name)}<span class="st">${status}</span></b><span class="v">${yen(v)}</span> ${pcs(v/st-1)}</div>`}).join('');
@@ -997,8 +1014,7 @@ function barHTML(){
  if(pl.bust)action=`<span class="wait">破産したため観戦中</span>`;
  else if(MODE==='local'){const others=alive.filter(id=>id!==MEID&&!ROOM.ready[id]).length;
    action=`<button class="go" id="next">${others?'取引終了、次の人へ':last?'最終ターンを終える':'次のターンへ'}</button>`}
- else if(mine){action=`<span class="wait">ほかの人を待っています（${alive.length}人中${done}人が完了）</span><button class="btn ghost" id="undo">取り消す</button>${ROOM.host===MEID&&done<alive.length?'<button class="btn dark" id="force">待たずに進める</button>':''}`}
- else action=`<button class="go" id="next">${last?'最終ターンを終える':'このターンを終える'}</button>`;
+ else action=`<button class="go" id="next">${last?'最終ターンへ（地上に戻る）':'次のターンへ'}</button>`;
  return `<span class="who">${MODE==='local'&&membersOrdered().length>1?`<span class="dot" style="background:${COLS[pl.color%COLS.length]}"></span> ${esc(pl.name)}の番`:esc(pl.name)}</span>
   <span>現金 <span class="cash">${yen(pl.cash)}</span></span>
   <span>資産合計 <span class="cash">${yen(value(pl))}</span> ${pcs(value(pl)/pl.start-1)}</span>
@@ -1069,17 +1085,21 @@ function extraHTML(n){
 /* ===================== 終了画面（玉手箱） ===================== */
 function maxDD(h){let pk=h[0],dd=0;for(const v of h){pk=Math.max(pk,v);dd=Math.min(dd,v/pk-1)}return dd}
 function renderEnd(){
- const ms=membersOrdered().filter(m=>PLAYERS[m.id]);
- const fin=m=>{const p=PLAYERS[m.id];return p.t>=G.t?p.hist[p.hist.length-1]:value(p)};
- const ranked=ms.map(m=>({m,p:PLAYERS[m.id],v:fin(m)})).sort((a,b)=>b.v-a.v);
- const yrs=r=>Math.max((G.t-r.p.joinT)/24,.01);
+ const ms=membersOrdered().filter(m=>PLAYERS[m.id]||m.id===MEID);
+ const pOf=m=>m.id===MEID&&ME?ME:PLAYERS[m.id];
+ const fin=m=>{const p=pOf(m);return MODE==='online'||p.t>=G.t?p.hist[p.hist.length-1]:value(p)};
+ const doneP=p=>p.bust||p.t>=ROOM.total;
+ const ranked=ms.map(m=>({m,p:pOf(m),v:fin(m)})).sort((a,b)=>(doneP(b.p)-doneP(a.p))||b.v-a.v);
+ const tOf=p=>Math.min(p.t,G.t);
+ const yrs=r=>Math.max((tOf(r.p)-r.p.joinT)/24,.01);
+ const benchP=p=>p.start*G.tri[tOf(p)+PRE]/G.tri[p.joinT+PRE];
  if(!ui.opened){
    app.innerHTML=`<div class="wrap setup"><div class="hero box-hero"><h1>地上に戻る日が来た</h1><p>${dstr(G.t)}。竜宮城で過ごした${(G.t/24).toFixed(1).replace('.0','')}年のあいだに、あなたの資産はどうなっただろう。</p>
     <button class="go gold" id="open">玉手箱を開ける</button></div></div>`;
    document.getElementById('open').onclick=()=>{ui.opened=true;render()};return;
  }
  const lessons=r=>{
-   const p=r.p,v=r.v,ret=v/p.start-1,bench=benchOf(p)/p.start-1,dd=maxDD(p.hist),out=[];
+   const p=r.p,v=r.v,ret=v/p.start-1,bench=benchP(p)/p.start-1,dd=maxDD(p.hist),out=[];
    out.push(ret>=bench?`同じ期間インデックスを放置した場合（${pc(bench)}）に勝った。プロの運用者でも長期でインデックスに勝ち続けられるのは少数派なので、これは立派な成績。`:`同じ期間インデックスを放置した場合（${pc(bench)}）に負けた。実は多くのプロも同じで、「全体を買って放置」は手強い相手。`);
    out.push(`最大で ${pc(dd)} の下落を経験した。${dd<-.3?'これだけ減ると精神的にきつく、現実では投げ売りしがち。分散やインデックスの比率で揺れを抑える手もある。':'下落を小さめに抑えられた。'}`);
    out.push(`売買は${p.trades}回、手数料は合計${yen(p.fees)}、特定口座で払った税金は${yen(p.tax.total)}。NISAのおかげで払わずに済んだ税金は${yen(p.tax.saved)}。`);
@@ -1095,12 +1115,13 @@ function renderEnd(){
   <header class="top"><h1 class="logo">${GAME}</h1><div class="date">玉手箱の中身<small>${G.t}ターン（${(G.t/24).toFixed(1).replace('.0','')}年）</small></div><span class="spacer"></span><button class="linkbtn" id="quit">トップへ</button></header>
   <div class="card"><h2>最終結果</h2><div class="tbl">
    <table class="rank"><thead><tr><th>順位</th><th>名前</th><th>最終資産</th><th>損益</th><th>リターン</th><th>年率</th><th>インデックス放置</th></tr></thead><tbody>
-   ${ranked.map((r,k)=>`<tr><td>${k+1}</td><td><span class="dot" style="background:${COLS[r.m.color%COLS.length]}"></span> ${esc(r.m.name)}${r.p.bust?'（破産）':''}${r.p.joinT?`<span class="hint">（${dstr(r.p.joinT)}から参加）</span>`:''}</td><td class="num">${yen(r.v)}</td><td>${sgnYen(r.v-r.p.start)}</td><td class="num">${pcs(r.v/r.p.start-1)}</td><td class="num">${pcs(Math.pow(Math.max(r.v,1)/r.p.start,1/yrs(r))-1)}</td><td class="num">${pcs(benchOf(r.p)/r.p.start-1)}</td></tr>`).join('')}
+   ${ranked.map((r,k)=>`<tr><td>${k+1}</td><td><span class="dot" style="background:${COLS[r.m.color%COLS.length]}"></span> ${esc(r.m.name)}${r.p.bust?'（破産）':''}${!doneP(r.p)?`<span class="hint">（進行中：${dstr(r.p.t)}）</span>`:''}${r.p.joinT?`<span class="hint">（${dstr(r.p.joinT)}から参加）</span>`:''}</td><td class="num">${yen(r.v)}</td><td>${sgnYen(r.v-r.p.start)}</td><td class="num">${pcs(r.v/r.p.start-1)}</td><td class="num">${pcs(Math.pow(Math.max(r.v,1)/r.p.start,1/yrs(r))-1)}</td><td class="num">${pcs(benchP(r.p)/r.p.start-1)}</td></tr>`).join('')}
    </tbody></table></div>
+   ${MODE==='online'&&ranked.some(r=>!doneP(r.p))?'<p class="hint">まだ進行中の人がいる。この画面を開き直すと、最新の順位が見られる。</p>':''}
    <p class="hint">「インデックス放置」は、その人が参加したときに元手を全部日本株インデックスに入れて、配当も再投資しながら何もしなかった場合。</p></div>
   <div class="card"><h2>資産の推移</h2>${c}
    <div class="legend">${ranked.map(r=>`<span><i style="border-color:${COLS[r.m.color%COLS.length]}"></i>${esc(r.m.name)}</span>`).join('')}<span><i class="dash" style="border-color:var(--muted)"></i>インデックス放置</span></div></div>
-  ${ranked.map(r=>`<div class="card"><h2>${esc(r.m.name)}の振り返り</h2>${lessons(r).map(l=>`<p class="lesson">${l}</p>`).join('')}</div>`).join('')}
+  ${ranked.filter(r=>MODE!=='online'||r.m.id===MEID).map(r=>`<div class="card"><h2>${esc(r.m.name)}の振り返り</h2>${lessons(r).map(l=>`<p class="lesson">${l}</p>`).join('')}</div>`).join('')}
  </div>`;
  document.getElementById('quit').onclick=()=>{ui.opened=false;quit()};
  drawCharts();
