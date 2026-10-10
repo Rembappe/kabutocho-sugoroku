@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 部屋：誰でも読める。進行は1ターンずつしか進められず、相場のシードや期間は変更できない
+    match /rooms/{code} {
+      allow get: if true;
+      allow create: if code.size() == 6
+                    && request.resource.data.t == 0
+                    && request.resource.data.seed is number
+                    && request.resource.data.total is number
+                    && request.resource.data.total <= 240;
+      allow update: if request.resource.data.seed == resource.data.seed
+                    && request.resource.data.total == resource.data.total
+                    && request.resource.data.cash == resource.data.cash
+                    && request.resource.data.host == resource.data.host
+                    && request.resource.data.t >= resource.data.t
+                    && request.resource.data.t <= resource.data.t + 1;
+
+      // 各プレイヤーの口座：合言葉の記録（pin）は作った後に書き換えられない
+      match /players/{pid} {
+        allow read: if true;
+        allow create: if request.resource.data.pin is string
+                      && request.resource.data.name is string
+                      && request.resource.data.name.size() <= 12;
+        allow update: if request.resource.data.pin == resource.data.pin
+                      && request.resource.data.name == resource.data.name;
+      }
+    }
+  }
+}

@@ -1,0 +1,1388 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>浦島太郎投資伝説</title>
+<meta name="description" content="竜宮城の取引所で株を売り買いして資産を増やす、すごろく式の投資学習ゲーム。友達とオンラインで対戦できる。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+
+/* レイアウト：上に1年分のすごろく盤（暦）、下に株価ボードと銘柄カルテ。大事件は竜宮新報の「号外」が割り込む */
+:root{
+  --paper:#E8ECF0;--card:#F9FAFB;--ink:#16202D;--muted:#596572;--line:#C5CDD6;--grid:#DCE2E8;
+  --board:#13202F;--board2:#1C2C40;--boardline:#2A3C52;--led:#E6ECF2;--ledmute:#8C9DB0;
+  --up:#C42F25;--down:#2459AD;--upL:#FF6B5D;--downL:#64A9FF;--gold:#D9981A;--goldsoft:#F5E6C0;
+  --shade:rgba(36,89,173,.10);--shade2:rgba(196,47,37,.13);
+  --sq:#DCE3EA;--sqpast:#CBD4DD;--sqnow:#FFFFFF;
+  --newsprint:#EDEBE5;--newsink:#1B1B1B;--newsred:#B8261C;
+  --p1:#C42F25;--p2:#2459AD;--p3:#C78512;--p4:#2B8A5E;--p5:#7B4FB0;--p6:#1E8C9C;--p7:#B0457A;--p8:#6B7280;
+  --disp:'Dela Gothic One','Zen Kaku Gothic New',sans-serif;
+  --num:'DotGothic16','Zen Kaku Gothic New',monospace;
+  --sans:'Zen Kaku Gothic New','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0E141B;--card:#17202A;--ink:#E5EAF0;--muted:#97A3B0;--line:#2B3744;--grid:#243040;
+  --up:#FF6B5D;--down:#64A9FF;--goldsoft:#3A3020;--shade:rgba(100,169,255,.12);--shade2:rgba(255,107,93,.14);
+  --sq:#1E2935;--sqpast:#141C25;--sqnow:#2C3C50;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0E141B;--card:#17202A;--ink:#E5EAF0;--muted:#97A3B0;--line:#2B3744;--grid:#243040;
+  --up:#FF6B5D;--down:#64A9FF;--goldsoft:#3A3020;--shade:rgba(100,169,255,.12);--shade2:rgba(255,107,93,.14);
+  --sq:#1E2935;--sqpast:#141C25;--sqnow:#2C3C50;color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+h1,h2,h3{text-wrap:balance}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:16px}
+.up{color:var(--up)}.down{color:var(--down)}
+.board .up{color:var(--upL)}.board .down{color:var(--downL)}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums}
+.spacer{flex:1}
+.linkbtn{background:none;border:none;color:var(--muted);text-decoration:underline;padding:4px}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;padding-bottom:10px}
+.logo{font-family:var(--disp);font-weight:400;font-size:24px;margin:0;letter-spacing:.04em}
+.date{font-family:var(--num);font-size:26px;line-height:1}
+.date small{font-size:14px;color:var(--muted);margin-left:8px}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-weight:700;font-size:12px;border:1px solid var(--line)}
+.pill.bad{background:var(--up);color:#fff;border-color:var(--up)}
+.pill.warn{background:var(--goldsoft);border-color:var(--gold)}
+
+/* すごろく盤 */
+.track{position:relative;background:var(--card);border:2px solid var(--ink);border-radius:10px;padding:10px;margin-bottom:12px}
+.track ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
+.sq{position:relative;min-height:52px;background:var(--sq);border-radius:5px;padding:3px 4px;font-size:11px;line-height:1.25;overflow:hidden}
+.sq.past{background:var(--sqpast);color:var(--muted)}
+.sq.now{background:var(--sqnow);outline:3px solid var(--gold);z-index:1}
+.sq .mo{font-weight:900;font-size:12px;display:block}
+.sq .hf{color:var(--muted);font-size:10px}
+.sq .bd{display:inline-block;font-size:10px;font-weight:700;padding:0 3px;border-radius:3px;margin-right:2px;background:var(--line);color:var(--ink)}
+.sq .bd.e{background:var(--ink);color:var(--paper)}
+.sq .bd.d{background:var(--gold);color:#1B1B1B}
+.sq .bd.n{background:var(--down);color:#fff}
+.sq .ev{display:block;font-weight:700;font-size:10px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sq .ev.bad{color:var(--down)}.sq .ev.good{color:var(--up)}
+.tok{display:flex;gap:2px;position:absolute;right:3px;bottom:3px}
+.tok i{width:15px;height:15px;border-radius:50%;font-style:normal;font-size:9px;font-weight:900;color:#fff;display:grid;place-items:center;border:1.5px solid var(--card)}
+.trackleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-top:8px}
+.yrlabel{font-family:var(--num);font-size:13px;color:var(--muted);margin-bottom:6px}
+@media (max-width:640px){.track ol{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media (prefers-reduced-motion:no-preference){
+  .sq.now.land{animation:land .7s cubic-bezier(.3,1.6,.5,1)}
+  @keyframes land{0%{transform:translateY(-14px) scale(1.08)}100%{transform:none}}
+  .extra .paper{animation:drop .45s ease-out}
+  @keyframes drop{from{transform:rotate(-4deg) translateY(-30px);opacity:0}to{transform:rotate(-1deg);opacity:1}}
+}
+
+/* players & nav */
+.players{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px}
+.pl{flex:0 0 auto;min-width:170px;padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:var(--card)}
+.pl.on{border:2px solid var(--ink)}
+.pl.bust{opacity:.45}
+.pl b{display:flex;align-items:center;gap:6px;font-size:13px}
+.pl .v{font-family:var(--num);font-size:18px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.nav{display:flex;gap:2px;border-bottom:2px solid var(--ink);margin-bottom:14px;overflow-x:auto}
+.nav button{background:none;border:none;border-radius:6px 6px 0 0;padding:8px 16px;font-weight:700;color:var(--muted)}
+.nav button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+
+/* layout */
+.main{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+.main>*{min-width:0}
+@media (max-width:920px){.main{grid-template-columns:1fr}}
+.cols2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:16px;align-items:start}
+
+/* board */
+.board{background:var(--board);color:var(--led);border-radius:8px;padding:10px 10px 4px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.tabs button{background:transparent;border:1px solid #33465D;color:var(--ledmute);border-radius:4px;padding:3px 12px;font-size:13px}
+.tabs button[aria-pressed="true"]{background:var(--led);color:var(--board);border-color:var(--led);font-weight:700}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+.board th{font-weight:500;font-size:12px;color:var(--ledmute);text-align:right;padding:4px 8px;border-bottom:1px solid var(--boardline);white-space:nowrap}
+.board th:first-child{text-align:left}
+.board td{padding:7px 8px;border-bottom:1px solid #1F3045;text-align:right;white-space:nowrap}
+.board td:first-child{text-align:left}
+.board tr.row{cursor:pointer}
+.board tr.row:hover td{background:var(--board2)}
+.board tr.sel td{background:#26405E}
+.nm{font-weight:700}
+.sec{display:block;font-size:11px;color:var(--ledmute);font-weight:400}
+.px{font-family:var(--num);font-size:17px}
+.usd{display:block;font-size:11px;color:var(--ledmute);font-family:var(--num)}
+.held{font-family:var(--num);color:var(--gold)}
+.pe{font-family:var(--num);font-size:13px}
+.pe.hi{color:var(--upL)}.pe.lo{color:var(--downL)}
+
+/* cards */
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:16px;min-width:0}
+.card h2{font-size:17px;margin:0 0 8px}
+.card h3{font-size:14px;margin:14px 0 6px}
+.desc{color:var(--muted);font-size:13px;margin:0 0 8px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;font-size:13px;margin:8px 0}
+.stats div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dotted var(--line);padding:2px 0}
+.stats span:last-child{font-family:var(--num);text-align:right}
+@media (max-width:420px){.stats{grid-template-columns:1fr}}
+.seg{display:flex;flex-wrap:wrap;gap:4px;margin:10px 0 4px}
+.seg button{border:1px solid var(--line);background:transparent;border-radius:4px;padding:4px 10px;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:700}
+.seg button:disabled{opacity:.35;cursor:not-allowed}
+.trade{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.trade input{width:110px;padding:8px;border:1px solid var(--line);border-radius:4px;background:var(--paper);font-family:var(--num);font-size:16px}
+.btn{border:none;border-radius:4px;padding:9px 16px;font-weight:700}
+.btn.buy{background:var(--up);color:#fff}
+.btn.sell{background:var(--down);color:#fff}
+.btn.ghost{background:transparent;border:1px solid var(--line)}
+.btn.dark{background:var(--ink);color:var(--paper)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+.msg{font-size:13px;margin-top:6px;min-height:1.2em}
+.msg.err{color:var(--up)}
+.holds{font-size:12px;display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px}
+
+/* charts */
+.ch{position:relative;width:100%;min-height:60px;margin:6px 0}
+.ch svg{display:block;width:100%;touch-action:pan-y}
+.ch .ax{font-size:11px;fill:var(--muted);font-family:var(--num)}
+.ch .tip{position:absolute;top:4px;pointer-events:none;background:var(--ink);color:var(--paper);font-size:12px;padding:4px 8px;border-radius:4px;max-width:220px;line-height:1.4}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:16px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
+.legend i.dash{border-top-style:dashed}
+.legend i.box{height:10px;border:none}
+.rng{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.rng button{border:1px solid var(--line);background:transparent;border-radius:999px;padding:1px 10px;font-size:12px}
+.rng button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+/* 業績 */
+.earn{display:flex;align-items:flex-end;gap:4px;height:84px;margin-top:4px}
+.earn div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px;min-width:0;height:100%}
+.earn b{display:block;width:100%;border-radius:2px 2px 0 0;background:var(--line)}
+.earn b.beat{background:var(--up)}.earn b.miss{background:var(--down)}
+.earn span{font-size:10px;color:var(--muted);font-family:var(--num);white-space:nowrap}
+
+/* news */
+.news{list-style:none;margin:0;padding:0}
+.news li{border-left:4px solid var(--gold);padding:6px 10px;margin:0 0 10px;background:var(--paper);border-radius:0 4px 4px 0}
+.news li.bad{border-left-color:var(--down)}
+.news li.good{border-left-color:var(--up)}
+.news li.me{border-left-color:var(--ink)}
+.news .tag{font-size:11px;font-weight:700;color:var(--muted)}
+.news .ttl{font-weight:700;display:block}
+.news details{font-size:13px;margin-top:4px}
+.news summary{cursor:pointer;color:var(--muted)}
+.moves{font-size:12px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 12px}
+.prec{font-size:12px;color:var(--muted)}
+
+/* coach */
+.coach{border:2px solid var(--gold)}
+.coach .step{font-family:var(--num);font-size:13px;color:var(--gold)}
+.coach p{margin:6px 0;font-size:14px}
+.coach .ex,.box{background:var(--paper);border-radius:4px;padding:8px 10px;margin:8px 0;font-size:14px}
+.coach .ex b{display:block;font-size:12px;color:var(--muted)}
+.lk{background:none;border:none;padding:0;font-weight:700;color:inherit;text-decoration:underline;text-decoration-color:var(--gold);text-underline-offset:3px}
+.coachbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.coachbar .btn{padding:6px 12px;font-weight:500}
+
+/* NISA */
+.meter{margin:8px 0}
+.meter .lb{display:flex;justify-content:space-between;font-size:13px;gap:8px}
+.meter .lb span:last-child{font-family:var(--num)}
+.meter .bar{height:10px;background:var(--paper);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.meter .bar i{display:block;height:100%;background:var(--gold)}
+.rtbl{width:100%;font-size:13px;border-collapse:collapse}
+.rtbl th,.rtbl td{border-bottom:1px solid var(--line);padding:6px 6px;text-align:left;vertical-align:top}
+.rtbl th{white-space:nowrap;color:var(--muted);font-weight:700}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.form label{display:block;font-size:12px;font-weight:700;color:var(--muted)}
+.form input{width:100%;padding:7px;border:1px solid var(--line);border-radius:4px;background:var(--paper);font-family:var(--num)}
+.big{font-family:var(--num);font-size:22px}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:8px 0}
+.kv div{background:var(--paper);border-radius:4px;padding:6px 10px}
+.kv small{display:block;font-size:11px;color:var(--muted)}
+
+/* bar */
+.bar{position:sticky;bottom:0;background:var(--paper);border-top:2px solid var(--ink);padding-block:12px calc(12px + env(safe-area-inset-bottom,0px));margin-top:8px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;z-index:5}
+.bar .who{font-weight:700}
+.bar .cash{font-family:var(--num);font-size:18px}
+.go{background:var(--ink);color:var(--paper);border:none;border-radius:6px;padding:12px 26px;font-size:17px;font-family:var(--disp);letter-spacing:.05em}
+
+/* 号外 */
+.extra{position:fixed;inset:0;background:rgba(10,14,20,.6);display:grid;place-items:center;padding:16px;z-index:20}
+.paper{background:var(--newsprint);color:var(--newsink);max-width:560px;width:100%;border-radius:2px;padding:18px 20px;transform:rotate(-1deg);box-shadow:0 10px 40px rgba(0,0,0,.35);display:grid;grid-template-columns:auto 1fr;gap:14px;max-height:90vh;overflow:auto}
+.paper .gougai{writing-mode:vertical-rl;font-family:var(--disp);font-size:44px;line-height:1;color:var(--newsred);border:3px solid var(--newsred);padding:8px 4px;align-self:start}
+.paper h2{font-family:var(--disp);font-weight:400;font-size:26px;line-height:1.3;margin:0 0 8px}
+.paper p{margin:6px 0;font-size:14px}
+.paper .src{font-size:12px;opacity:.75}
+.paper .btn{background:var(--newsink);color:var(--newsprint);margin-top:8px}
+.paper .moves span{font-weight:700}
+.paper .up{color:var(--newsred)}.paper .down{color:#1F4E9A}
+
+/* setup */
+.setup{max-width:660px;margin:0 auto}
+.hero{background:var(--board);color:var(--led);border-radius:10px;padding:26px 22px;margin-bottom:18px;overflow:hidden}
+.hero h1{font-family:var(--disp);font-size:42px;line-height:1.15;margin:0 0 8px;font-weight:400}
+.hero p{margin:0;color:var(--ledmute)}
+.ticker{font-family:var(--num);white-space:nowrap;margin-top:16px;font-size:15px;overflow:hidden}
+.ticker span{margin-right:22px}
+.field{margin-bottom:14px}
+.field>label{display:block;font-weight:700;margin-bottom:4px}
+.field select,.field .names input{width:100%;padding:9px;border:1px solid var(--line);border-radius:4px;background:var(--card)}
+.names{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chk{display:flex;gap:8px;align-items:center;font-weight:400}
+.rules{font-size:14px}
+.rules li{margin-bottom:4px}
+
+/* end */
+.rank{width:100%;border-collapse:collapse;font-size:14px}
+.rank th,.rank td{padding:8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.rank th:nth-child(-n+2),.rank td:nth-child(-n+2){text-align:left}
+.lesson{background:var(--paper);border-radius:4px;padding:8px 12px;margin:6px 0;font-size:14px}
+
+/* オンライン対戦 */
+.txt{width:100%;padding:9px;border:1px solid var(--line);border-radius:4px;background:var(--card)}
+.sess{display:flex;flex-wrap:wrap;gap:8px}
+.code{font-size:13px;color:var(--muted)}
+.code b{font-size:17px;color:var(--ink);letter-spacing:.08em}
+.sel{user-select:all;word-break:break-all}
+.wait{font-weight:700;color:var(--muted)}
+.pl .st{margin-left:auto;font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 6px}
+.pl.done .st{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.go:disabled{opacity:.5;cursor:wait}
+.go.gold{background:var(--gold);color:#1B1B1B;margin-top:16px}
+.box-hero{text-align:left}
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ===================== オンライン対戦の設定（Firebase） ===================== */
+const FIREBASE_CONFIG=null; // ← ここにFirebaseの設定を入れる
+
+
+/* ===================== 定数とデータ ===================== */
+const DT=1/24;      // 1ターン = 2週間（1ヶ月2ターン）
+const PRE=120;     // ゲーム開始前に作る過去の相場（5年分）
+// ↑ PRE：ゲーム開始前に作る過去の相場（5年分）
+const TAX=.20315;   // 株の利益と配当にかかる税金（所得税15.315%＋住民税5%）
+const NISA_LIM={yT:1200000,yS:2400000,life:18000000,lifeS:12000000};
+const HALF=w=>w===1?'前半':'後半';
+const SECTORS={auto:'自動車',elec:'電機',game:'ゲーム',retail:'小売',bank:'銀行',fa:'FA機器',semi:'半導体',invest:'投資',airline:'空運',utility:'電力',trade:'商社',leisure:'レジャー',tech:'IT',ev:'EV',ecom:'EC',ad:'広告',bev:'飲料',aero:'航空機',index:'インデックス',gold:'金'};
+// c:通貨 v:個別の荒さ b:市場との連動 y:配当利回り g:利益の成長率(年) pe:今のPER pm:平均的なPER cy:景気への敏感さ
+const STOCKS=[
+ {id:'toyota',name:'トヨダ自動車',c:'JP',sec:'auto',p:2800,v:.18,b:1.0,y:.030,g:.04,pe:9,pm:10,cy:1.2,desc:'世界最大級の自動車メーカー。円安は追い風、関税や品質問題は逆風。'},
+ {id:'sony',name:'ソミーグループ',c:'JP',sec:'elec',p:3300,v:.22,b:1.1,y:.006,g:.07,pe:18,pm:17,cy:.9,desc:'ゲーム機、音楽、映画、イメージセンサー。稼ぎ口が多い。'},
+ {id:'nin',name:'任天道',c:'JP',sec:'game',p:9000,v:.26,b:.8,y:.015,g:.05,pe:20,pm:18,cy:.5,desc:'ゲーム機とソフト。新ハードやヒット作で大きく動く。'},
+ {id:'fr',name:'ファーストリテイリソグ',c:'JP',sec:'retail',p:48000,v:.22,b:1.0,y:.008,g:.09,pe:35,pm:30,cy:.6,desc:'ユニクル を展開。株価が高い「値がさ株」の代表。'},
+ {id:'mufg',name:'三菱UFG',c:'JP',sec:'bank',p:1800,v:.22,b:1.2,y:.035,g:.06,pe:11,pm:10,cy:1.1,desc:'国内最大の銀行グループ。金利が上がると利ざやが増えやすい。'},
+ {id:'kye',name:'キーエソス',c:'JP',sec:'fa',p:62000,v:.22,b:1.1,y:.005,g:.07,pe:40,pm:35,cy:1.2,desc:'工場自動化センサー。超高収益だが景気の波を受ける。'},
+ {id:'tel',name:'東京エレクトロソ',c:'JP',sec:'semi',p:25000,v:.33,b:1.4,y:.015,g:.10,pe:25,pm:22,cy:1.5,desc:'半導体製造装置。AI需要と輸出規制に振り回されやすい。'},
+ {id:'sbg',name:'ソフトパンクグループ',c:'JP',sec:'invest',p:9000,v:.40,b:1.5,y:.005,g:.05,pe:15,pm:15,cy:1.3,desc:'世界中のテック企業に投資。値動きは激しい。'},
+ {id:'jal',name:'日本航宙',c:'JP',sec:'airline',p:2700,v:.20,b:.9,y:.030,g:.03,pe:11,pm:12,cy:1.3,desc:'航空会社。燃料価格、感染症、訪日客数に敏感。'},
+ {id:'tepco',name:'東京電カ',c:'JP',sec:'utility',p:600,v:.26,b:.7,y:0,g:.02,pe:8,pm:9,cy:.4,desc:'電力会社。燃料高と災害リスクを抱える。'},
+ {id:'itc',name:'伊藤虫商事',c:'JP',sec:'trade',p:7500,v:.18,b:.9,y:.025,g:.05,pe:11,pm:10,cy:1.0,desc:'総合商社。資源高で儲かりやすく、配当も厚い。'},
+ {id:'olc',name:'オリエソタルランド',c:'JP',sec:'leisure',p:3300,v:.20,b:.8,y:.003,g:.06,pe:60,pm:50,cy:.8,desc:'テーマパーク運営。外出制限に弱く、訪日客に強い。'},
+ {id:'aapl',name:'アツプル',c:'US',sec:'tech',p:230,v:.22,b:1.1,y:.005,g:.07,pe:30,pm:25,cy:.7,desc:'スマホとサービス。新製品と規制のニュースで動く。'},
+ {id:'msft',name:'マイクロソフド',c:'US',sec:'tech',p:420,v:.20,b:1.0,y:.008,g:.10,pe:33,pm:30,cy:.6,desc:'OSとクラウド。AI投資の中心にいる。'},
+ {id:'nvda',name:'エヌビデイア',c:'US',sec:'semi',p:130,v:.45,b:1.6,y:0,g:.22,pe:45,pm:32,cy:1.5,desc:'AI向けGPU。ブームの主役だが過熱と反動も大きい。'},
+ {id:'tsla',name:'テスリ',c:'US',sec:'ev',p:250,v:.50,b:1.8,y:0,g:.12,pe:80,pm:50,cy:1.4,desc:'EVメーカー。期待で買われ、失望で売られる。'},
+ {id:'amzn',name:'アマゾソ',c:'US',sec:'ecom',p:190,v:.27,b:1.2,y:0,g:.12,pe:40,pm:35,cy:1.0,desc:'ネット通販とクラウド。巣ごもり需要に強い。'},
+ {id:'googl',name:'アルファベッド',c:'US',sec:'ad',p:170,v:.24,b:1.1,y:.005,g:.10,pe:22,pm:22,cy:.9,desc:'検索と広告。独禁法の訴訟リスクを抱える。'},
+ {id:'ko',name:'コカ・ゴーラ',c:'US',sec:'bev',p:65,v:.13,b:.5,y:.030,g:.04,pe:24,pm:22,cy:.2,desc:'飲料。景気に左右されにくいディフェンシブ株。'},
+ {id:'ba',name:'ボーイソグ',c:'US',sec:'aero',p:160,v:.32,b:1.2,y:0,g:.04,pe:40,pm:28,cy:1.3,desc:'旅客機メーカー。品質問題が続くと信頼を失う。'},
+ {id:'jpm',name:'JPモルカン',c:'US',sec:'bank',p:210,v:.20,b:1.1,y:.022,g:.05,pe:12,pm:12,cy:1.1,desc:'米国最大の銀行。金利と景気に連動。'},
+ {id:'jpidx',name:'日本株インデックス',c:'JP',sec:'index',p:2700,v:.02,b:1.0,y:.020,g:.06,pe:15,pm:15,cy:1.0,desc:'TOPIX型。日本株全体をまとめて買う投資信託。NISAのつみたて投資枠でも買える。'},
+ {id:'usidx',name:'全米株インデックス',c:'US',sec:'index',p:300,v:.02,b:1.0,y:.013,g:.09,pe:22,pm:21,cy:1.0,desc:'米国株全体をまとめて買う投資信託（ドル建て）。NISAのつみたて投資枠でも買える。'},
+ {id:'gold',name:'金（1グラム）',c:'US',sec:'gold',p:77,v:.15,b:0,y:0,desc:'危機に買われやすい安全資産。利益も配当もない。'},
+];
+const S=Object.fromEntries(STOCKS.map(s=>[s.id,s]));
+const NONIDX=s=>s.sec!=='index'&&s.sec!=='gold';
+const fee=s=>s.c==='JP'?0:(s.id==='gold'?.005:.0045);
+const feeOf=(s,a)=>a!=='tok'&&s.c==='US'?0:fee(s); // 大手ネット証券はNISAの米国株手数料が無料
+const EARN_MONTHS={JP:[2,5,8,11],US:[1,4,7,10]};
+const earnWeek=s=>(STOCKS.indexOf(s)%2)+1;
+const ACCT={tok:'特定口座',seicho:'NISA成長投資枠',tsumi:'NISAつみたて投資枠'};
+const COLS=['var(--p1)','var(--p2)','var(--p3)','var(--p4)','var(--p5)','var(--p6)','var(--p7)','var(--p8)'];
+
+/* ===================== 乱数 ===================== */
+const R=()=>G.rng();
+const rr=(a,b)=>a+R()*(b-a);
+const randn=()=>{let u=0,v=0;while(!u)u=R();while(!v)v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+const pick=f=>{const c=STOCKS.filter(f);return c.length?c[Math.floor(R()*c.length)]:null};
+
+/* ===================== ニュース ===================== */
+// imp: {mkt|sector|id, pct, f}  f:1 は会社の稼ぐ力そのもの（利益）が変わる＝戻りにくい。f無しは市場の気分（PER）＝時間とともに戻りやすい
+const EVENTS=[
+ {p:.0012,make:()=>({mood:'bad',tag:'金融危機',title:'米大手投資銀行が経営破綻。世界的な金融危機へ',
+   explain:'金融機関同士が互いを信用できなくなり、お金の流れが止まる。株は一斉に売られ、安全資産とされる円や金が買われやすい。しばらく値動きが荒く、下げやすい相場が続く。',
+   prec:'2008年 リーマン・ショック',imp:[{mkt:'JP',pct:-.12},{mkt:'US',pct:-.13},{sector:'bank',pct:-.15,f:1},{sector:'invest',pct:-.15},{id:'gold',pct:.06}],fx:-.07,regime:{type:'crisis',w:30},pending:[{in:24,kind:'stimulus'}]})},
+ {p:.0009,make:()=>({mood:'bad',tag:'感染症',title:'新型ウイルスが世界に拡大、各国が外出制限',
+   explain:'人の移動が止まり、航空やレジャーは売上が蒸発する。一方で通販やゲームのような「家の中の需要」は伸びる。同じ危機でも業種によって明暗が分かれる。',
+   prec:'2020年 コロナ・ショック',imp:[{mkt:'JP',pct:-.10},{mkt:'US',pct:-.10},{sector:'airline',pct:-.25,f:1},{sector:'leisure',pct:-.22,f:1},{sector:'aero',pct:-.18,f:1},{sector:'ecom',pct:.10,f:1},{sector:'game',pct:.08,f:1},{id:'gold',pct:.04}],fx:-.03,regime:{type:'crisis',w:10},
+   pending:[{in:8,kind:'stimulus'},{in:40,kind:'reopen'}]})},
+ {p:.004,make:()=>({mood:'good',tag:'技術革新',title:'生成AIの新モデルが登場、AI投資が一段と加速',
+   explain:'AIを動かす半導体や、それを作る装置メーカーに注文が集まる。期待が先行して株価が業績以上に上がることもあり、そうなると反動も大きい。',
+   prec:'2023年〜 生成AIブーム',imp:[{sector:'semi',pct:.08},{id:'nvda',pct:.08,f:1},{sector:'tech',pct:.04}],drift:[{m:{sector:'semi'},pw:.010,w:14}],pending:[{in:Math.round(rr(16,36)),kind:'aibust'}]})},
+ {p:.006,make:()=>({mood:'bad',tag:'金融政策',title:'日銀が利上げを決定',
+   explain:'金利が上がると銀行は貸出の利ざやが増えて有利。円は買われやすく（円高）、輸出企業の利益は目減りする。借金の多い企業には重荷。',
+   prec:'2024年7月 日銀利上げ → 翌週の急落',imp:[{sector:'bank',pct:.05,f:1},{mkt:'JP',pct:-.025},{sector:'utility',pct:-.03},{sector:'auto',pct:-.02}],fx:-.025})},
+ {p:.005,make:()=>({mood:'good',tag:'金融政策',title:'日銀総裁、追加利上げに慎重な姿勢',
+   explain:'利上げが遠のくと円が売られやすくなる。円安は輸出企業の追い風で、日本株全体が上がりやすい。',
+   prec:'中央銀行の発言ひとつで為替が動く例は多い',imp:[{mkt:'JP',pct:.015},{sector:'bank',pct:-.03}],fx:.02})},
+ {p:.006,make:()=>({mood:'bad',tag:'金融政策',title:'米FRBが利上げ、インフレ退治を優先',
+   explain:'米金利が上がると、将来の成長に期待して買われていたハイテク株の価値が割り引かれやすい。日米の金利差が広がり、ドル高円安に。',
+   prec:'2022年 FRBの急ピッチ利上げ',imp:[{mkt:'US',pct:-.03},{sector:'tech',pct:-.03},{sector:'ev',pct:-.04},{sector:'semi',pct:-.03}],fx:.02})},
+ {p:.006,make:()=>({mood:'good',tag:'金融政策',title:'米FRBが利下げを決定',
+   explain:'金利が下がると株の相対的な魅力が増し、特に成長株が買われやすい。日米金利差が縮まり円高方向へ。',
+   prec:'2019年・2024年の利下げ局面',imp:[{mkt:'US',pct:.025},{sector:'tech',pct:.03},{sector:'bank',pct:-.02}],fx:-.02})},
+ {p:.007,make:()=>({mood:'good',tag:'為替',title:'円安が急進',
+   explain:'海外で稼ぐ輸出企業は、ドルの売上を円に直すと増えるので有利。燃料をドルで買う航空会社には逆風。米国株を持っていれば円換算の資産も増える。',
+   prec:'2022〜2024年の歴史的円安',imp:[{sector:'auto',pct:.04,f:1},{sector:'elec',pct:.02},{sector:'fa',pct:.02},{sector:'airline',pct:-.02}],fx:.03})},
+ {p:.006,make:()=>({mood:'bad',tag:'為替',title:'円高が急進',
+   explain:'輸出企業の利益が目減りし、日本株は下がりやすい。米国株は株価が変わらなくても、円換算では目減りする（為替リスク）。',
+   prec:'2024年8月 円キャリートレードの巻き戻し',imp:[{sector:'auto',pct:-.04,f:1},{sector:'elec',pct:-.02},{mkt:'JP',pct:-.015}],fx:-.03})},
+ {p:.0012,make:()=>({mood:'bad',tag:'災害',title:'大地震が発生、工場停止や停電が相次ぐ',
+   explain:'被災地の工場停止で部品が届かなくなり、影響はサプライチェーン全体に広がる。電力会社は設備被害に直撃される。保険金支払いのため円が買い戻されることも。',
+   prec:'2011年 東日本大震災',imp:[{mkt:'JP',pct:-.06},{sector:'utility',pct:-.12,f:1},{sector:'leisure',pct:-.06},{sector:'auto',pct:-.03}],fx:-.02})},
+ {p:.005,make:()=>({mood:'bad',tag:'地政学',title:'中東情勢が緊迫、原油価格が急騰',
+   explain:'燃料費が増える航空・電力には逆風。資源権益を持つ商社は儲かる。物価高が景気を冷やす懸念から株全体も重くなる。',
+   prec:'2022年 ロシアのウクライナ侵攻後の資源高',imp:[{sector:'airline',pct:-.07},{sector:'utility',pct:-.04},{sector:'trade',pct:.05,f:1},{sector:'aero',pct:-.03},{mkt:'JP',pct:-.015},{mkt:'US',pct:-.01},{id:'gold',pct:.02}]})},
+ {p:.005,make:()=>({mood:'bad',tag:'貿易',title:'米政権が輸入車に追加関税を表明',
+   explain:'米国に車を輸出する日本の自動車メーカーに直撃。関税は会社の利益を直接削るので、気分だけの下げより戻りにくい。報復関税の連鎖が心配され、市場全体にも売りが広がる。',
+   prec:'2025年 米国の関税政策',imp:[{sector:'auto',pct:-.07,f:1},{mkt:'JP',pct:-.025},{mkt:'US',pct:-.015}],fx:-.01})},
+ {p:.004,make:()=>({mood:'bad',tag:'規制',title:'半導体の対中輸出規制が強化',
+   explain:'大口の売り先を失うおそれから、半導体と製造装置の株が売られる。政治の決定ひとつで業績見通しが変わる典型例。',
+   prec:'2022年〜 米国の対中半導体規制',imp:[{sector:'semi',pct:-.08,f:1},{mkt:'JP',pct:-.008}]})},
+ {p:.004,make:()=>({mood:'bad',tag:'規制',title:'巨大IT企業に独占禁止法違反の判断',
+   explain:'事業の分割や巨額の制裁金のリスク。どれだけ強い企業でも、規制当局は無視できない。',
+   prec:'2024年 米国の検索事業をめぐる独禁法判決',imp:[{sector:'ad',pct:-.06},{sector:'tech',pct:-.03},{sector:'ecom',pct:-.04}]})},
+ {p:.0012,make:()=>({mood:'bad',tag:'暴落',title:'世界同時株安、パニック売りが連鎖',
+   explain:'はっきりした理由がなくても、売りが売りを呼んで暴落することがある。会社の稼ぐ力は変わっていないので、慌てて売った後に急反発することも多い。「狼狽売り」の怖さが分かる場面。',
+   prec:'1987年 ブラックマンデー／2024年8月5日 日経平均−12.4%',imp:[{mkt:'JP',pct:-.10},{mkt:'US',pct:-.08},{id:'gold',pct:.02}],fx:-.03,drift:[{m:{mkt:'JP'},pw:.012,w:5},{m:{mkt:'US'},pw:.010,w:5}]})},
+ {p:.005,make:()=>({mood:'good',tag:'景気',title:'訪日外国人が過去最高を更新',
+   explain:'インバウンド消費でテーマパーク、航空、小売が潤う。円安が続くと日本旅行は割安になる。',
+   prec:'2024年 訪日客数の過去最高更新',imp:[{sector:'leisure',pct:.05,f:1},{sector:'airline',pct:.04,f:1},{sector:'retail',pct:.03}]})},
+ {p:.003,make:()=>{const win=R()<.5;return {mood:win?'good':'bad',tag:'政治',title:win?'衆院選で与党が大勝、政策継続への期待':'衆院選で与党が過半数割れ、政局が不安定に',
+   explain:'選挙は政策の見通しを変える。海外投資家は「政治の安定」を好むため、結果次第で日本株全体が動く。',
+   prec:'2005年 郵政選挙／2024年 与党過半数割れ',imp:[{mkt:'JP',pct:win?.03:-.03}],fx:win?.01:-.01}}},
+ {p:.006,make:()=>{const s=pick(x=>['auto','ev','aero','elec'].includes(x.sec));return s&&{mood:'bad',tag:'不祥事',title:`${s.name}で品質不正・リコールが発覚`,
+   explain:'品質問題は回収費用だけでなく、ブランドの信頼を失う長期的なダメージになる。出荷停止になれば売上も止まる。',
+   prec:'2023〜24年 自動車の認証不正／ボーイング機の事故',imp:[{id:s.id,pct:-rr(.08,.14),f:1}],drift:[{m:{id:s.id},pw:-.005,w:6}]}}},
+ {p:.008,make:()=>{const s=pick(x=>['game','elec','tech','ev','leisure','retail','bev','ecom'].includes(x.sec));return s&&{mood:'good',tag:'ヒット',title:`${s.name}の新製品が大ヒット`,
+   explain:'予想を超える売れ行きは、将来の利益見通しを押し上げる。ただし発表前から期待で買われていた場合、上げ幅は小さくなる。',
+   prec:'新型ゲーム機・新型スマホの発売時',imp:[{id:s.id,pct:rr(.06,.14),f:1}]}}},
+ {p:.008,make:()=>{const s=pick(NONIDX);return s&&{mood:'good',tag:'株主還元',title:`${s.name}が大規模な自社株買いを発表`,
+   explain:'会社が自分の株を買うと、市場に出回る株が減って1株あたりの利益が増える。「経営陣は自社株を割安と見ている」というサインにもなる。',
+   prec:'近年の日本企業で増えている株主還元策',imp:[{id:s.id,pct:rr(.04,.07),f:1}]}}},
+ {p:.0008,make:()=>{const s=pick(NONIDX);return s&&{mood:'bad',tag:'粉飾',title:`${s.name}で不正会計が発覚`,
+   explain:'決算の数字そのものが信用できなくなると、投資家は一斉に逃げる。上場廃止の心配まで出てくる。1社に集中投資する怖さが分かる例。',
+   prec:'2011年 オリンパス／2015年 東芝',imp:[{id:s.id,pct:-.25,f:1},{id:s.id,pct:-.20}],drift:[{m:{id:s.id},pw:-.01,w:6}]}}},
+ {p:.0004,make:()=>{const s=pick(x=>NONIDX(x)&&x.v>=.4);return s&&{mood:'bad',tag:'経営危機',title:`${s.name}が資金繰りに行き詰まり、経営危機に`,
+   explain:'借金を返せなくなると株の価値はほぼゼロになり得る。「有名企業だから大丈夫」は通用しない。',
+   prec:'2010年 JAL経営破綻',imp:[{id:s.id,pct:-.75,f:1}]}}},
+ {p:.006,make:()=>{const s=pick(NONIDX);return s&&{mood:'good',tag:'噂',title:`${s.name}に買収提案があるとの噂`,
+   explain:'噂だけで株価は動くが、本当とは限らない。次のターンに結果が出る。噂で買うのは「当たれば大きいが、外れれば戻される」賭け。',
+   prec:'TOB（株式公開買付け）の観測報道',imp:[{id:s.id,pct:.06}],pending:[{in:2,kind:'rumor',id:s.id}]}}},
+ {p:.006,make:()=>{const s=pick(NONIDX),up=R()<.5;return s&&{mood:up?'good':'bad',tag:'アナリスト',title:`大手証券が${s.name}の評価を${up?'引き上げ':'引き下げ'}`,
+   explain:'アナリストの評価変更は機関投資家の売買のきっかけになる。ただし評価が当たるとは限らず、会社の稼ぐ力は変わっていない。',
+   prec:'レーティング変更は日常的に起きる',imp:[{id:s.id,pct:up?.04:-.04}]}}},
+ {p:.003,make:()=>{const s=pick(x=>(NONIDX(x)&&x.c==='US')||['sbg','fr'].includes(x.id));return s&&{mood:'bad',tag:'経営',title:`${s.name}のカリスマ経営者が退任を発表`,
+   explain:'「この人がいるから買う」という投資家が多い会社ほど、トップ交代は不安材料になる。',
+   prec:'創業者・名物経営者の退任報道',imp:[{id:s.id,pct:-.06}]}}},
+];
+function resolvePending(pd){
+ if(pd.kind==='stimulus')return {mood:'good',tag:'政策対応',title:'各国が大規模な金融緩和と景気対策を打ち出す',
+   explain:'危機の後には中央銀行と政府がお金を流し込むことが多い。最悪期に売らずに持ち続けた人が報われるのはこの場面。',
+   prec:'2009年・2020年の金融緩和と株価の急回復',imp:[{mkt:'JP',pct:.05},{mkt:'US',pct:.06}],drift:[{m:{mkt:'JP'},pw:.006,w:12},{m:{mkt:'US'},pw:.007,w:12}],endRegime:true};
+ if(pd.kind==='reopen')return {mood:'good',tag:'景気',title:'行動制限が解除され、旅行や外食の需要が戻る',
+   explain:'止まっていた需要が一気に戻る「リオープン」。大きく落ちた航空やレジャーの利益が回復し始める。',
+   prec:'2022〜23年 経済再開',imp:[{sector:'airline',pct:.18,f:1},{sector:'leisure',pct:.15,f:1},{sector:'aero',pct:.12,f:1}]};
+ if(pd.kind==='aibust'){if(R()<.5)return null;
+   return {mood:'bad',tag:'過熱',title:'AI関連株に過熱感、利益確定売りが殺到',
+   explain:'ブームで上がりすぎた株は、ちょっとした失望で大きく売られる。「みんなが買っているから」で買った人が一番痛い目を見る。',
+   prec:'2000年 ITバブル崩壊／2024年夏のAI株調整',imp:[{sector:'semi',pct:-.15},{sector:'tech',pct:-.05}]};}
+ if(pd.kind==='rumor'){const s=S[pd.id];
+   if(R()<.4)return {mood:'good',tag:'TOB',title:`${s.name}、買収が正式発表。買付価格は時価を大きく上回る`,
+     explain:'TOBは通常、市場価格に上乗せ（プレミアム）して買い取るので株価が跳ねる。噂の段階で買っていた人の勝ち。',prec:'日本で増えているTOB・MBO',imp:[{id:s.id,pct:.18}]};
+   return {mood:'bad',tag:'噂',title:`${s.name}、買収の噂を否定`,
+     explain:'噂で上がった分がはげ落ちる。「噂で買って事実で売れ」と言われるが、事実がなければただ戻されるだけ。',prec:'観測報道の否定',imp:[{id:s.id,pct:-.07}]};}
+ return null;
+}
+const CYCLE_NEWS={
+ rec:{mood:'bad',tag:'景気',title:'景気後退入り。企業の利益が減り始める',
+   explain:'景気には「拡大」と「後退」の波がある。後退期は自動車、半導体、機械のような景気敏感株の利益が大きく落ち、飲料や電力のようなディフェンシブ株は比較的落ちにくい。株価は景気より半年ほど先に動くと言われ、後退の終盤には回復を先取りして上がり始めることも多い。',
+   prec:'2008〜09年、2020年の景気後退'},
+ exp:{mood:'good',tag:'景気',title:'景気が底打ち、回復局面へ',
+   explain:'後退が終わると企業の利益は回復に向かう。落ち込みが大きかった景気敏感株ほど戻りも大きくなりやすい。',
+   prec:'2009年以降、2020年後半以降の回復'}};
+const MAJOR=new Set(['金融危機','感染症','暴落','災害','粉飾','経営危機','TOB']);
+const isMajor=n=>MAJOR.has(n.tag)||(n.tag==='景気'&&n.mood==='bad'&&n.title.startsWith('景気後退'));
+
+/* ===================== 乱数（部屋ごとのシードで全員が同じ相場を見る） ===================== */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+/* ===================== 状態 ===================== */
+let G=null;        // 相場（シードから毎回同じものが再現される）
+let ROOM=null;     // 部屋の設定と進行
+let PLAYERS={};    // 全員の口座（id→データ）
+let OWNED=[];      // この端末で操作する人のid
+let MEID=null;     // 今操作している人
+let ME=null;
+let STORE=null,MODE=null,UNSUB=[];
+let ui={view:'trade',msg:'',err:false,qty:'',acct:'tok',showLog:false,lesson:null,coachOpen:false,range:72,mrange:'all',extra:null,land:false,quitArm:false,
+  sim:{m:30000,y:20,r:5},sel:'toyota',filter:'all',seenT:-1,busy:false,lobbyMsg:'',copied:false};
+
+const pxJ=id=>G.st[id].p*(S[id].c==='US'?G.fx:1);
+const pxJh=(id,i)=>G.st[id].h[i]*(S[id].c==='US'?G.fxH[i]:1);
+const pxAt=(id,t)=>pxJh(id,t+PRE);
+const idxNow=()=>G.fxH.length-1;
+function dateOf(t){const k=Math.floor(t/2);return {y:2027+Math.floor(t/24),m:((k%12)+12)%12+1,w:((t%2)+2)%2+1}}
+const dstr=t=>{const d=dateOf(t);return `${d.y}年${d.m}月${HALF(d.w)}`};
+function match(m,s){if(m.mkt)return s.c===m.mkt&&s.sec!=='gold';if(m.sector)return s.sec===m.sector;if(m.id)return s.id===m.id;return false}
+
+function buildMarket(seed){
+ const st={};
+ for(const s of STOCKS){
+   if(s.sec==='gold')st[s.id]={p:s.p*Math.exp(-.05*PRE/24),h:[],e:[],q:[],ev:[]};
+   else{const eps=s.p/s.pe*Math.exp(-s.g*PRE/24);st[s.id]={eps,per:s.pe,p:eps*s.pe,h:[],e:[],q:[],ev:[]};}
+ }
+ G={seed,rng:mulberry32(seed),t:-PRE,fx:140,fxH:[],cycH:[],tri:[],st,regime:null,drifts:[],pending:[],log:[],major:[],marks:{},
+   cyc:{phase:'exp',age:30},newsByT:{},divByT:{},_divJ:0};
+ record();
+ while(G.t<0)mstep();
+ G.newsByT[0]=[{mood:'',tag:'開場',title:'取引開始。まずは気になる銘柄を選んで、長期チャートと業績を見てみよう',explain:'1ターン＝2週間、1ヶ月は前半・後半の2ターン。売買はいつでも何度でもでき、全員が「このターンを終える」を押すと相場が動く。チャートにはゲーム開始前5年分の歴史も入っている。',prec:''}];
+}
+function extendTo(t){while(G.t<t)mstep()}
+function record(){
+ for(const s of STOCKS){const x=G.st[s.id];x.h.push(x.p);x.e.push(x.eps??null)}
+ G.fxH.push(G.fx);
+ G.cycH.push(G.regime?2:G.cyc.phase==='rec'?1:0);
+ const n=G.tri.length,p=G.st.jpidx.p;
+ G.tri.push(n?G.tri[n-1]*(p+G._divJ)/G.st.jpidx.h[n-1]:1);G._divJ=0;
+}
+const curNews=()=>G.newsByT[G.t]||[];
+
+function applyEvent(e){
+ const before=Object.fromEntries(STOCKS.map(s=>[s.id,pxJ(s.id)]));
+ for(const im of (e.imp||[]))for(const s of STOCKS)if(match(im,s)){
+   const f=Math.max(im.mkt?1+im.pct*s.b:1+im.pct,.02),x=G.st[s.id];
+   if(s.sec==='gold'){x.p*=f;continue}
+   if(im.f)x.eps*=f;else x.per*=f;
+   x.p=x.eps*x.per;
+ }
+ if(e.fx)G.fx*=1+e.fx;
+ for(const d of (e.drift||[])){const w=Math.max(1,Math.round(d.w/2));G.drifts.push({m:d.m,pw:d.pw*d.w/w,w})}
+ if(e.regime)G.regime={type:e.regime.type,w:Math.ceil(e.regime.w/2)};
+ if(e.endRegime)G.regime=null;
+ for(const p of (e.pending||[]))G.pending.push({at:G.t+Math.max(1,Math.round(p.in/2)),kind:p.kind,id:p.id});
+ const moves=STOCKS.map(s=>({id:s.id,pct:pxJ(s.id)/before[s.id]-1})).filter(x=>Math.abs(x.pct)>.004)
+   .sort((a,b)=>Math.abs(b.pct)-Math.abs(a.pct));
+ for(const m of moves)if(Math.abs(m.pct)>.03)G.st[m.id].ev.push({t:G.t,tag:e.tag,title:e.title});
+ return {mood:e.mood,tag:e.tag,title:e.title,explain:e.explain,prec:e.prec,moves:moves.slice(0,5),fxMove:e.fx||0};
+}
+
+/* ===================== 相場を1ターン進める（プレイヤーには触らない） ===================== */
+function mstep(){
+ G.t++;
+ const news=[],live=G.t>0,{m,w}=dateOf(G.t);
+ // 景気の波（拡大は平均4年ほど、後退は1年弱）
+ const c=G.cyc;c.age++;
+ if(c.phase==='exp'&&R()<(c.age>36?1/70:1/160)){c.phase='rec';c.age=0;news.push({...CYCLE_NEWS.rec})}
+ else if(c.phase==='rec'&&R()<(c.age>8?1/12:1/40)){c.phase='exp';c.age=0;news.push({...CYCLE_NEWS.exp})}
+ const crisis=!!G.regime,rec=c.phase==='rec';
+ // 市場全体の気分（PER）の揺れ
+ let sJ=.15,sU=.15;if(crisis){sJ*=1.7;sU*=1.7}else if(rec){sJ*=1.25;sU*=1.25}
+ const z1=randn(),z2=.6*z1+.8*randn(),dm=(crisis?-.15:0)+(rec?-.06:0);
+ const mJ=dm*DT+sJ*Math.sqrt(DT)*z1,mU=dm*DT+sU*Math.sqrt(DT)*z2;
+ const sf={};for(const k in SECTORS)sf[k]=(k==='index'||k==='gold')?0:.09*Math.sqrt(DT)*randn();
+ const startJ=Object.fromEntries(STOCKS.map(s=>[s.id,pxJ(s.id)]));
+ for(const s of STOCKS){const x=G.st[s.id];
+   if(s.sec==='gold'){x.p*=Math.exp((.05+(crisis?.12:0))*DT+.15*Math.sqrt(DT)*randn());continue}
+   // 利益（EPS）：会社ごとの成長＋景気の波
+   const ge=s.g+(rec?-.20*s.cy:.04*s.cy)+(crisis?-.15*s.cy:0);
+   x.eps*=Math.exp(ge*DT+(.04+s.v*.1)*Math.sqrt(DT)*randn());
+   // PER：市場の気分。行き過ぎるとゆっくり平均に戻る
+   let lp=s.b*(s.c==='JP'?mJ:mU)+sf[s.sec]+s.v*(crisis?1.5:1)*Math.sqrt(DT)*randn()+.35*DT*Math.log(s.pm/x.per)+s.y*DT;
+   for(const d of G.drifts)if(match(d.m,s))lp+=Math.log(1+(d.m.mkt?d.pw*s.b:d.pw));
+   x.per=Math.min(300,Math.max(3,x.per*Math.exp(lp)));
+   x.p=x.eps*x.per;
+ }
+ G.fx*=Math.exp(.09*Math.sqrt(DT)*randn()+.4*DT*Math.log(145/G.fx)+(crisis?-.002:0));
+ G.drifts.forEach(d=>d.w--);G.drifts=G.drifts.filter(d=>d.w>0);
+ if(G.regime){G.regime.w--;if(G.regime.w<=0){G.regime=null;news.push({mood:'good',tag:'市況',title:'市場の混乱がひとまず落ち着く',explain:'恐怖が和らぐと値動きは普段の大きさに戻っていく。',prec:''})}}
+ // 予定されていた出来事
+ const due=G.pending.filter(p=>p.at<=G.t);G.pending=G.pending.filter(p=>p.at>G.t);
+ for(const p of due){const e=resolvePending(p);if(e)news.push(applyEvent(e))}
+ // ランダムなニュース
+ let fired=0;
+ for(const ev of EVENTS.slice().sort(()=>R()-.5)){
+   if(fired>=2)break;
+   if(R()<ev.p*3.2){const e=ev.make();if(e){news.push(applyEvent(e));fired++}}
+ }
+ // 決算
+ const earn=[];
+ for(const s of STOCKS){
+   if(!NONIDX(s)||!EARN_MONTHS[s.c].includes(m)||earnWeek(s)!==w)continue;
+   const x=G.st[s.id],z=randn(),sens=.02+s.v*.10;let pct=z*sens,twist=false;
+   const kind=z>.8?'予想を上回る好決算':z<-.8?'予想を下回る決算':'ほぼ予想通りの決算';
+   x.eps*=1+Math.max(pct,-.5);
+   if(z>.8&&R()<.18){x.per*=1-Math.abs(pct)*1.5;twist=true}
+   x.p=x.eps*x.per;
+   const prev=x.q.length>=4?x.q[x.q.length-4].eps:null;
+   x.q.push({t:G.t,eps:x.eps,yoy:prev?x.eps/prev-1:null,sur:z>.8?'beat':z<-.8?'miss':'in'});
+   const move=(1+Math.max(pct,-.5))*(twist?1-Math.abs(pct)*1.5:1)-1;
+   if(Math.abs(move)>.05)x.ev.push({t:G.t,tag:'決算',title:`${s.name}：${kind}${twist?'なのに下落':''}`});
+   earn.push({s,kind,pct:move,twist});
+ }
+ if(earn.length){
+   const tw=earn.some(e=>e.twist);
+   news.push({mood:'',tag:'決算',title:'決算発表：'+earn.map(e=>`${e.s.name}（${e.kind}${e.twist?'なのに下落':''}）`).join('、'),
+     explain:'株価は「結果」ではなく「予想とのズレ」で動く。予想通りなら大きくは動かない。決算で変わるのは会社の稼ぐ力（利益）なので、その分は時間がたっても戻りにくい。'+(tw?'好決算でも下がったのは「材料出尽くし」。期待で先に買われていた分、発表と同時に売られた。':''),
+     prec:'日本企業は2・5・8・11月、米国企業は1・4・7・10月に決算が集中する',moves:earn.map(e=>({id:e.s.id,pct:e.pct}))});
+ }
+ // 配当（日本株は3・9月、米国株は3・6・9・12月の後半に権利確定）。1株あたりの金額を記録し、各自の口座はあとで反映
+ if(w===2&&m%3===0){
+   const paysJP=m===3||m===9,divs=[];
+   for(const s of STOCKS){if(!s.y)continue;
+     const d=s.c==='JP'?(paysJP?s.y/2:0):s.y/4;if(!d)continue;
+     const ps=pxJ(s.id)*d;divs.push({id:s.id,ps});
+     if(s.id==='jpidx')G._divJ=G.st.jpidx.p*d;
+     const x=G.st[s.id];x.per*=1-d;x.p=x.eps*x.per;
+   }
+   G.divByT[G.t]=divs;
+   if(divs.length)news.push({mood:'',tag:'配当',title:`配当の権利確定。${paysJP?'日本株と米国株':'米国株'}の保有者に配当金が入金`,
+     explain:'配当をもらう権利が確定すると、その分だけ株価が下がる（権利落ち）。特定口座では配当にも20.315%の税金がかかり、NISAなら非課税。米国株の配当は米国で10%が先に引かれる。',prec:''});
+ }
+ if(live&&m===1&&w===1)news.push({mood:'good',tag:'NISA',title:'新しい年。NISAの年間投資枠がリセットされた',explain:'つみたて投資枠120万円、成長投資枠240万円が新たに使える。去年NISAで売った分の枠（買ったときの金額ぶん）も今年から復活した。特定口座の損益と税金の計算も年ごとに区切られる。',prec:''});
+ record();
+ if(!news.length&&live){
+   const j=pxJ('jpidx')/startJ.jpidx-1,u=pxJ('usidx')/startJ.usidx-1;
+   news.push({mood:'',tag:'市況',title:`この2週間は目立った材料なし。日本株 ${pc(j)}、米国株（円換算） ${pc(u)}`,explain:'ニュースがなくても株価は毎回動く。小さな値動きに一喜一憂しすぎないのも大事。',prec:''});
+ }
+ for(const n of news)if(n.tag!=='市況'&&n.tag!=='決算'&&n.tag!=='配当'&&n.tag!=='NISA')G.log.unshift({...n,t:G.t});
+ G.log=G.log.slice(0,80);
+ for(const n of news)if(isMajor(n))G.major.unshift({t:G.t,title:n.title,tag:n.tag});
+ const top=news.find(isMajor)||news.find(n=>!['市況','決算','配当','NISA'].includes(n.tag));
+ if(top)G.marks[G.t]={tag:top.tag,mood:top.mood,title:top.title};
+ if(live)G.newsByT[G.t]=news;
+}
+
+/* ===================== 口座・税金・NISA ===================== */
+function newPlayer(name,pin,cash,t,color){return {name,pin,cash,hold:{},hist:[cash],t,joinT:t,start:cash,trades:0,fees:0,bust:false,divs:0,color,
+  tax:{yrGain:0,yrPaid:0,total:0,saved:0},nisa:{yT:0,yS:0,pendT:0,pendS:0},plan:{jpidx:0,usidx:0},notes:[],coachOff:false}}
+function holds(pl){return Object.entries(pl.hold).map(([k,h])=>{const [a,id]=k.split(':');return {k,a,id,sh:h.sh,cost:h.cost}})}
+function holdOf(pl,id){let sh=0,cost=0;for(const x of holds(pl))if(x.id===id){sh+=x.sh;cost+=x.cost}return sh>1e-9?{sh,cost}:null}
+function valueAt(pl,t){let v=pl.cash;for(const x of holds(pl))v+=x.sh*pxAt(x.id,t);return v}
+function value(pl){let v=pl.cash;for(const x of holds(pl))v+=x.sh*pxJ(x.id);return v}
+function benchOf(pl){const i=G.t+PRE,j=pl.joinT+PRE;return pl.start*G.tri[i]/G.tri[j]}
+function nisaBook(pl){let T=pl.nisa.pendT,Sg=pl.nisa.pendS;for(const x of holds(pl)){if(x.a==='tsumi')T+=x.cost;if(x.a==='seicho')Sg+=x.cost}return {T,S:Sg}}
+function nisaRoom(pl,a){const b=nisaBook(pl),life=NISA_LIM.life-b.T-b.S;
+ if(a==='tsumi')return Math.max(0,Math.min(NISA_LIM.yT-pl.nisa.yT,life));
+ if(a==='seicho')return Math.max(0,Math.min(NISA_LIM.yS-pl.nisa.yS,NISA_LIM.lifeS-b.S,life));
+ return Infinity}
+// 特定口座（源泉徴収あり）：その年の損益を合計し、税金を差し引き・還付する
+function realize(pl,x){const t=pl.tax;t.yrGain+=x;const due=Math.max(0,t.yrGain)*TAX,d=due-t.yrPaid;pl.cash-=d;t.yrPaid=due;t.total+=d;return d}
+const acctOK=(s,a)=>a==='tok'||(a==='tsumi'?s.sec==='index':s.sec!=='gold');
+const fsh=x=>Number.isInteger(x)?String(x):x.toFixed(2);
+
+// 相場が進んだ分だけ、自分の口座に配当・積立・年替わりを反映する
+function catchUp(pl,T){
+ if(pl.t>=T)return false;
+ const notes=[],multi=T-pl.t>1;
+ for(let t=pl.t+1;t<=T;t++){
+   const {m,w}=dateOf(t),pre=multi?`${dstr(t)}：`:'';
+   if(!pl.bust){
+     for(const dv of (G.divByT[t]||[]))for(const h of holds(pl))if(h.id===dv.id){
+       let amt=h.sh*dv.ps;if(S[dv.id].c==='US')amt*=.9; // 米国で10%源泉徴収
+       pl.cash+=amt;pl.divs+=amt;
+       if(h.a==='tok')realize(pl,amt);else pl.tax.saved+=amt*TAX;
+     }
+     if(m===1&&w===1){pl.nisa.yT=0;pl.nisa.yS=0;pl.nisa.pendT=0;pl.nisa.pendS=0;pl.tax.yrGain=0;pl.tax.yrPaid=0}
+     if(w===1)for(const id of ['jpidx','usidx']){const amt=pl.plan[id];if(!amt)continue;
+       const room=nisaRoom(pl,'tsumi'),use=Math.min(amt,room);
+       if(use<1000){notes.push(`${pre}${S[id].name}の積立は、つみたて投資枠が今年いっぱいのため見送り`);continue}
+       if(pl.cash<use){notes.push(`${pre}現金が足りず、${S[id].name}の積立（${yen(use)}）を見送り`);continue}
+       const sh=use/pxAt(id,t),k='tsumi:'+id,h=pl.hold[k]||{sh:0,cost:0};h.sh+=sh;h.cost+=use;pl.hold[k]=h;pl.cash-=use;pl.nisa.yT+=use;
+       notes.push(`${pre}つみたて設定どおり${S[id].name}を${yen(use)}ぶん自動で購入`);
+     }
+   }
+   const v=pl.bust?pl.hist[pl.hist.length-1]:valueAt(pl,t);pl.hist.push(v);
+   if(!pl.bust&&v<pl.start*.1){pl.bust=true;notes.push(`資産が元手の1割を割り込み、破産して退場`)}
+ }
+ pl.t=T;pl.notes=notes;
+ return true;
+}
+
+/* ===================== 表示ヘルパ ===================== */
+const yen=v=>Math.round(v).toLocaleString('ja-JP')+'円';
+const man=v=>Math.abs(v)>=1e8?(v/1e8).toFixed(2).replace(/\.?0+$/,'')+'億円':Math.abs(v)>=1e4?(v/1e4).toFixed(Math.abs(v)>=1e6?0:1).replace(/\.0$/,'')+'万円':yen(v);
+const sgnYen=v=>`<span class="${v>=0?'up':'down'}">${v>=0?'+':'−'}${Math.round(Math.abs(v)).toLocaleString('ja-JP')}円</span>`;
+const pc=x=>(x>=0?'+':'−')+Math.abs(x*100).toFixed(1)+'%';
+const pcs=x=>`<span class="${x>=0?'up':'down'}">${pc(x)}</span>`;
+const fp=v=>v>=1000?Math.round(v).toLocaleString('ja-JP'):v.toFixed(1);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function spark(arr,w,h,col){
+ const mn=Math.min(...arr),mx=Math.max(...arr),r=mx-mn||1;
+ const pts=arr.map((v,i)=>`${(i/(arr.length-1)*w).toFixed(1)},${(h-2-(v-mn)/r*(h-4)).toFixed(1)}`).join(' ');
+ return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline fill="none" stroke="${col}" stroke-width="1.6" points="${pts}"/></svg>`;
+}
+function earnIn(s){for(let t=G.t+1;t<=G.t+24;t++){const d=dateOf(t);if(EARN_MONTHS[s.c].includes(d.m)&&earnWeek(s)===d.w)return t-G.t}return 99}
+function nextEarn(s){if(!NONIDX(s))return 'なし';const k=earnIn(s);if(k>24)return '—';const d=dateOf(G.t+k);return k===1?'次のターン！':`${d.m}月${HALF(d.w)}（${k}ターン後）`}
+const perNow=id=>G.st[id].per;
+function growth3(id){const e=G.st[id].e,n=e.length-1,k=Math.min(72,n);return e[n-k]?Math.pow(e[n]/e[n-k],24/k)-1:null}
+
+/* ===================== チャート ===================== */
+const CH={};
+function niceTicks(mn,mx,k){const span=mx-mn||Math.abs(mx)||1;let st=Math.pow(10,Math.floor(Math.log10(span/k)));const e=span/k/st;st*=e>=7.5?10:e>=3.5?5:e>=1.5?2:1;
+ const out=[];for(let v=Math.floor(mn/st)*st;v<=mx+st*.5;v+=st)out.push(+v.toFixed(10));return out}
+const axYen=v=>Math.abs(v)>=1e8?(v/1e8).toFixed(1).replace(/\.0$/,'')+'億':Math.abs(v)>=1e4?(v/1e4).toFixed(Math.abs(v)>=1e5?0:1).replace(/\.0$/,'')+'万':Math.round(v).toLocaleString('ja-JP');
+// o: {series:[{d,c,n,dash}], shade:[0|1|2], marks:[{i,label}], xl:i=>label|null, tip:i=>html, fmt:v=>str, h}
+function chart(id,o){CH[id]=o;return `<div class="ch" data-ch="${id}" style="height:${o.h||200}px"></div>`}
+function drawCharts(){
+ document.querySelectorAll('[data-ch]').forEach(el=>{
+   const o=CH[el.dataset.ch];if(!o)return;
+   const W=Math.max(260,el.clientWidth||600),H=o.h||200,L=48,Rr=10,T=10,B=22;
+   const n=o.series[0].d.length;let mn=Infinity,mx=-Infinity;
+   for(const s of o.series)for(const v of s.d)if(v!=null&&isFinite(v)){mn=Math.min(mn,v);mx=Math.max(mx,v)}
+   if(!isFinite(mn)){mn=0;mx=1}
+   if(o.zero)mn=Math.min(0,mn);
+   const pad=(mx-mn)*.06||Math.abs(mx)*.05||1;mn-=o.zero&&mn===0?0:pad;mx+=pad;
+   const ticks=niceTicks(mn,mx,4).filter(v=>v>=mn&&v<=mx);
+   const X=i=>L+(n<=1?0:i/(n-1))*(W-L-Rr),Y=v=>T+(1-(v-mn)/(mx-mn))*(H-T-B);
+   let g='';
+   if(o.shade){let st=-1,val=0;for(let i=0;i<=n;i++){const v=i<n?o.shade[i]:0;
+     if(v!==val){if(val&&st>=0)g+=`<rect x="${X(st).toFixed(1)}" y="${T}" width="${Math.max(2,X(i-1)-X(st)).toFixed(1)}" height="${H-T-B}" fill="${val===2?'var(--shade2)':'var(--shade)'}"/>`;st=i;val=v}}}
+   for(const v of ticks){const y=Y(v).toFixed(1);g+=`<line x1="${L}" x2="${W-Rr}" y1="${y}" y2="${y}" stroke="var(--grid)" stroke-width="1"/><text class="ax" x="${L-6}" y="${(+y+4)}" text-anchor="end">${(o.fmt||axYen)(v)}</text>`}
+   let lastX=-99;
+   for(let i=0;i<n;i++){const lb=o.xl&&o.xl(i);if(lb&&X(i)-lastX>34){g+=`<line x1="${X(i).toFixed(1)}" x2="${X(i).toFixed(1)}" y1="${T}" y2="${H-B}" stroke="var(--grid)" stroke-width="1"/><text class="ax" x="${X(i).toFixed(1)}" y="${H-6}" text-anchor="middle">${lb}</text>`;lastX=X(i)}}
+   if(o.vline!=null&&o.vline>=0&&o.vline<n)g+=`<line x1="${X(o.vline)}" x2="${X(o.vline)}" y1="${T}" y2="${H-B}" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="2 3"/><text class="ax" x="${X(o.vline)+4}" y="${T+10}">開始</text>`;
+   for(const s of o.series){let path='',pen=false;
+     s.d.forEach((v,i)=>{if(v==null||!isFinite(v)){pen=false;return}path+=(pen?'L':'M')+X(i).toFixed(1)+','+Y(v).toFixed(1);pen=true});
+     g+=`<path d="${path}" fill="none" stroke="${s.c}" stroke-width="${s.w||2}" ${s.dash?'stroke-dasharray="5 4"':''} stroke-linejoin="round"/>`}
+   for(const mk of (o.marks||[])){const v=o.series[0].d[mk.i];if(v==null)continue;g+=`<circle cx="${X(mk.i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="var(--gold)" stroke="var(--card)" stroke-width="1.5"/>`}
+   const last=o.series[0].d[n-1];if(last!=null)g+=`<circle cx="${X(n-1)}" cy="${Y(last)}" r="3.5" fill="${o.series[0].c}"/>`;
+   g+=`<line class="hv" x1="0" x2="0" y1="${T}" y2="${H-B}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>`;
+   el.innerHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.label||'チャート')}">${g}</svg><div class="tip" hidden></div>`;
+   const svg=el.querySelector('svg'),hv=svg.querySelector('.hv'),tip=el.querySelector('.tip');
+   const move=e=>{const r=svg.getBoundingClientRect(),x=e.clientX-r.left;let i=Math.round((x-L)/(W-L-Rr)*(n-1));i=Math.max(0,Math.min(n-1,i));
+     hv.setAttribute('x1',X(i));hv.setAttribute('x2',X(i));hv.setAttribute('visibility','visible');
+     const mk=(o.marks||[]).filter(m=>Math.abs(m.i-i)<=Math.max(1,n/120));
+     tip.innerHTML=(o.tip?o.tip(i):'')+mk.map(m=>`<div>● ${esc(m.label)}</div>`).join('');tip.hidden=false;
+     tip.style.left=Math.min(Math.max(0,X(i)+10),W-230)+'px'};
+   svg.addEventListener('pointermove',move);svg.addEventListener('pointerdown',move);
+   svg.addEventListener('pointerleave',()=>{hv.setAttribute('visibility','hidden');tip.hidden=true});
+ });
+}
+let rzT;window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(drawCharts,150)});
+const tAt=i=>i-PRE;
+const yearXL=off=>i=>{const t=tAt(i+off);return t%24===0?String(dateOf(t).y):null};
+function windowOf(range){const N=idxNow()+1;const L=range==='all'?N:Math.min(N,range+1);return {off:N-L,len:L}}
+/* ===================== 保存先（オンライン＝Firebase、1台＝この端末） ===================== */
+const clone=o=>o==null?o:JSON.parse(JSON.stringify(o));
+function setPath(obj,key,val){const ks=key.split('.');let o=obj;for(let i=0;i<ks.length-1;i++){if(typeof o[ks[i]]!=='object'||!o[ks[i]])o[ks[i]]={};o=o[ks[i]]}o[ks[ks.length-1]]=val}
+// メモリ上のストア。bus を複数の端末で共有すればテスト用の疑似オンラインにもなる
+function MemStore(bus,persist){
+ const fire=()=>{if(persist)persist(bus.data);setTimeout(()=>bus.subs.slice().forEach(s=>s()),0)};
+ const sub=fn=>{bus.subs.push(fn);setTimeout(fn,0);return ()=>{bus.subs=bus.subs.filter(x=>x!==fn)}};
+ return {
+  get:async p=>clone(bus.data[p]??null),
+  set:async(p,o)=>{bus.data[p]=clone(o);fire()},
+  update:async(p,patch)=>{const d=bus.data[p];if(!d)throw new Error('not-found');for(const k in patch)setPath(d,k,clone(patch[k]));fire()},
+  watchDoc:(p,cb)=>{let last;return sub(()=>{const s=JSON.stringify(bus.data[p]??null);if(s!==last){last=s;cb(clone(bus.data[p]??null))}})},
+  watchCol:(p,cb)=>{let last;return sub(()=>{const pre=p+'/',out=Object.keys(bus.data).filter(k=>k.startsWith(pre)&&!k.slice(pre.length).includes('/')).sort().map(k=>({id:k.slice(pre.length),data:clone(bus.data[k])}));const s=JSON.stringify(out);if(s!==last){last=s;cb(out)}})},
+  tx:async(p,fn)=>{const nw=fn(clone(bus.data[p]??null));if(nw){bus.data[p]=clone(nw);fire()}return nw},
+ };
+}
+const LOCAL_KEY='kabutocho-local-v3';
+let LOCAL_BUS=null;
+function localStore(){
+ if(!LOCAL_BUS){let data={};try{data=JSON.parse(localStorage.getItem(LOCAL_KEY))||{}}catch(e){}LOCAL_BUS={data,subs:[]}}
+ return MemStore(LOCAL_BUS,d=>{try{localStorage.setItem(LOCAL_KEY,JSON.stringify(d))}catch(e){}});
+}
+let ONLINE=null,ONLINE_ERR='';
+async function onlineStore(){
+ if(ONLINE)return ONLINE;
+ if(window.__TEST_BUS__)return ONLINE=MemStore(window.__TEST_BUS__);
+ if(!FIREBASE_CONFIG)throw new Error('no-config');
+ const V='10.12.2';
+ const A=await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
+ const F=await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
+ const db=F.getFirestore(A.initializeApp(FIREBASE_CONFIG));
+ const ref=p=>F.doc(db,p);
+ return ONLINE={
+  get:async p=>{const s=await F.getDoc(ref(p));return s.exists()?s.data():null},
+  set:(p,o)=>F.setDoc(ref(p),o),
+  update:(p,o)=>F.updateDoc(ref(p),o),
+  watchDoc:(p,cb)=>F.onSnapshot(ref(p),s=>cb(s.exists()?s.data():null),storeError),
+  watchCol:(p,cb)=>F.onSnapshot(F.collection(db,p),q=>cb(q.docs.map(d=>({id:d.id,data:d.data()}))),storeError),
+  tx:(p,fn)=>F.runTransaction(db,async tr=>{const s=await tr.get(ref(p));const nw=fn(s.exists()?s.data():null);if(nw)tr.set(ref(p),nw);return nw}),
+ };
+}
+function storeError(e){console.error(e);ui.netErr='サーバーとの通信に失敗しました。電波の良い場所で、ページを再読み込みしてください。';renderBarOnly()}
+
+/* ===================== 部屋と参加 ===================== */
+const ROOM_CHARS='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const pid=name=>Array.from(new TextEncoder().encode(name)).map(b=>b.toString(16).padStart(2,'0')).join('');
+function cyrb53(str,seed=0){let h1=0xdeadbeef^seed,h2=0x41c6ce57^seed;for(let i=0,ch;i<str.length;i++){ch=str.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677)}
+ h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return (4294967296*(2097151&h2)+(h1>>>0)).toString(36)}
+const hashPin=(code,name,pin)=>cyrb53(`${code}:${name}:${pin}`)+cyrb53(`${pin}:${name}:${code}`,7);
+const roomPath=c=>'rooms/'+c,plPath=(c,id)=>`rooms/${c}/players/${id}`;
+const SESS_KEY='kabutocho-sessions';
+function sessions(){try{return JSON.parse(localStorage.getItem(SESS_KEY))||[]}catch(e){return []}}
+function remember(s){try{const l=sessions().filter(x=>!(x.code===s.code&&x.id===s.id));l.unshift({...s,at:Date.now()});localStorage.setItem(SESS_KEY,JSON.stringify(l.slice(0,6)))}catch(e){}}
+function forget(code,id){try{localStorage.setItem(SESS_KEY,JSON.stringify(sessions().filter(x=>!(x.code===code&&x.id===id))))}catch(e){}}
+const validName=n=>n.length>=1&&n.length<=12;
+const validPin=p=>/^\d{4}$/.test(p);
+
+async function createOnline({name,pin,cash,turns,coach}){
+ const store=await onlineStore();
+ let code='';for(let k=0;k<5;k++){code=Array.from({length:6},()=>ROOM_CHARS[Math.floor(Math.random()*ROOM_CHARS.length)]).join('');if(!(await store.get(roomPath(code))))break}
+ const id=pid(name),h=hashPin(code,name,pin),seed=Math.floor(Math.random()*4294967296);
+ await store.set(roomPath(code),{code,seed,t:0,total:turns,cash,coach,host:id,members:{[id]:{name,color:0,bust:false,order:0}},ready:{},created:Date.now(),v:3});
+ await store.set(plPath(code,id),newPlayer(name,h,cash,0,0));
+ remember({code,id,name,pin:h});
+ enter('online',store,code,[id]);
+}
+async function joinOnline({code,name,pin}){
+ const store=await onlineStore();
+ const room=await store.get(roomPath(code));
+ if(!room)throw new Error('部屋が見つかりません。部屋コードを確かめてください。');
+ const id=pid(name),h=hashPin(code,name,pin);
+ const pl=await store.get(plPath(code,id));
+ if(pl){if(pl.pin!==h)throw new Error('この名前はもう使われていて、合言葉が違います。自分の名前なら合言葉を確かめて、新しく参加するなら別の名前にしてください。')}
+ else{
+   if(room.t>=room.total)throw new Error('このゲームはもう終わっています。');
+   const n=Object.keys(room.members||{}).length;
+   if(n>=8)throw new Error('この部屋は満員です（8人まで）。');
+   await store.set(plPath(code,id),newPlayer(name,h,room.cash,room.t,n));
+   await store.update(roomPath(code),{[`members.${id}`]:{name,color:n,bust:false,order:n}});
+ }
+ remember({code,id,name,pin:h});
+ enter('online',store,code,[id]);
+}
+async function resumeOnline(s){
+ const store=await onlineStore();
+ const pl=await store.get(plPath(s.code,s.id));
+ if(!pl||pl.pin!==s.pin){forget(s.code,s.id);throw new Error('この部屋の記録が見つかりませんでした。部屋コード・名前・合言葉から入り直してください。')}
+ remember(s);
+ enter('online',store,s.code,[s.id]);
+}
+async function createLocal({names,cash,turns,coach}){
+ LOCAL_BUS=null;try{localStorage.removeItem(LOCAL_KEY)}catch(e){}
+ const store=localStore(),code='LOCAL',seed=Math.floor(Math.random()*4294967296),members={},ids=[];
+ names.forEach((n,i)=>{let id=pid(n);while(members[id])id+='_';members[id]={name:n,color:i,bust:false,order:i};ids.push(id)});
+ await store.set(roomPath(code),{code,seed,t:0,total:turns,cash,coach,host:ids[0],members,ready:{},created:Date.now(),v:3});
+ for(const [i,id] of ids.entries())await store.set(plPath(code,id),newPlayer(names[i],'',cash,0,i));
+ enter('local',store,code,ids);
+}
+function localSaved(){const s=localStore();return (LOCAL_BUS.data[roomPath('LOCAL')])||null}
+
+function enter(mode,store,code,owned){
+ leave();
+ MODE=mode;STORE=store;OWNED=owned;MEID=owned[0];PLAYERS={};ROOM=null;G=null;
+ ui={...ui,view:'trade',msg:'',qty:'',seenT:-1,extra:null,lesson:null,coachOpen:false,netErr:'',quitArm:false};
+ if(mode==='online')try{history.replaceState(null,'','#'+code)}catch(e){}
+ UNSUB.push(store.watchDoc(roomPath(code),onRoom));
+ UNSUB.push(store.watchCol(roomPath(code)+'/players',onPlayers));
+ app.innerHTML='<div class="wrap"><p class="desc">部屋に接続しています…</p></div>';
+}
+function leave(){UNSUB.forEach(f=>{try{f()}catch(e){}});UNSUB=[]}
+function quit(){leave();ROOM=null;G=null;MODE=null;try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}render()}
+
+const membersOrdered=()=>Object.entries(ROOM.members||{}).sort((a,b)=>a[1].order-b[1].order).map(([id,m])=>({id,...m}));
+const aliveIds=()=>membersOrdered().filter(m=>!m.bust).map(m=>m.id);
+const isOver=()=>ROOM.t>=ROOM.total||aliveIds().length===0;
+
+function onRoom(r){
+ if(!r){ui.lobbyMsg='部屋が見つかりませんでした。';quit();return}
+ const turnChanged=!ROOM||r.t!==ROOM.t;
+ ROOM=r;
+ if(!G||G.seed!==r.seed)buildMarket(r.seed);
+ extendTo(Math.min(r.t,r.total));
+ syncOwned();
+ if(r.t>ui.seenT){if(ui.seenT>=0){ui.extra=curNews().find(isMajor)||null;ui.land=true;ui.lesson=null;ui.msg=''}ui.seenT=r.t}
+ pickMe();
+ maybeAdvance();
+ if(turnChanged||!document.getElementById('bar'))render();else renderBarOnly();
+ ui.land=false;
+}
+function onPlayers(list){
+ let mineChanged=false;
+ for(const {id,data} of list){
+   if(OWNED.includes(id)&&PLAYERS[id])continue; // 自分の口座は手元の最新を正とする
+   PLAYERS[id]=data;if(OWNED.includes(id))mineChanged=true;
+ }
+ if(!ROOM||!G)return;
+ syncOwned();pickMe();
+ if(mineChanged||!document.getElementById('bar'))render();else renderBarOnly();
+}
+// 相場が進んでいたら、自分の口座に配当・積立などを反映して保存
+function syncOwned(){
+ if(!ROOM||!G)return;
+ const T=Math.min(ROOM.t,ROOM.total);
+ for(const id of OWNED){const pl=PLAYERS[id];if(!pl)continue;
+   if(catchUp(pl,T)){persist(id);if(pl.bust&&!ROOM.members[id]?.bust)STORE.update(roomPath(ROOM.code),{[`members.${id}.bust`]:true}).catch(storeError)}}
+}
+function pickMe(){
+ if(MODE==='local'){const next=membersOrdered().find(m=>!m.bust&&!ROOM.ready[m.id]);if(next)MEID=next.id}
+ ME=PLAYERS[MEID]||null;
+}
+function maybeAdvance(){
+ if(isOver())return;
+ const alive=aliveIds();
+ if(alive.length&&alive.every(id=>ROOM.ready[id]))advance(false);
+}
+function advance(force){
+ const expect=ROOM.t;
+ STORE.tx(roomPath(ROOM.code),cur=>{
+   if(!cur||cur.t!==expect||cur.t>=cur.total)return null;
+   const alive=Object.entries(cur.members).filter(([,m])=>!m.bust).map(([id])=>id);
+   if(!force&&!alive.every(id=>cur.ready&&cur.ready[id]))return null;
+   return {...cur,t:cur.t+1,ready:{}};
+ }).catch(storeError);
+}
+function persist(id){const pl=PLAYERS[id];if(pl)STORE.set(plPath(ROOM.code,id),pl).catch(storeError)}
+function endTurn(){if(!ME||ME.bust)return;ui.msg='';ui.qty='';ui.quitArm=false;STORE.update(roomPath(ROOM.code),{[`ready.${MEID}`]:true}).catch(storeError)}
+function undoEnd(){STORE.update(roomPath(ROOM.code),{[`ready.${MEID}`]:false}).catch(storeError)}
+
+function trade(side,qty){
+ const pl=ME,s=S[ui.sel],a=ui.acct,p=pxJ(s.id),f=feeOf(s,a),k=a+':'+s.id;
+ if(!pl||pl.bust)return;
+ if(ROOM.ready[MEID])return err('このターンはもう終えています。売買するなら「取り消す」を押してください。');
+ qty=side==='buy'?Math.floor(qty):qty;
+ if(!(qty>0))return err('数量を1以上で入れてください');
+ if(side==='buy'){
+   if(!acctOK(s,a))return err(a==='tsumi'?'つみたて投資枠で買えるのは、長期・積立・分散向けの投資信託だけ。このゲームでは日本株・全米株インデックスの2本です。':'このゲームでは金はNISAの対象外にしています。');
+   const cost=qty*p,fe=cost*f;
+   if(a!=='tok'){const room=nisaRoom(pl,a);if(cost>room+1e-6)return err(`${ACCT[a]}の枠が足りません。今買えるのは${yen(room)}まで（${Math.floor(room/p)}株）。`)}
+   if(cost+fe>pl.cash+1e-6)return err(`現金が足りません。最大 ${maxBuy()} 株まで買えます`);
+   pl.cash-=cost+fe;pl.fees+=fe;
+   const h=pl.hold[k]||{sh:0,cost:0};h.cost+=cost+fe;h.sh+=qty;pl.hold[k]=h;
+   if(a==='tsumi')pl.nisa.yT+=cost;if(a==='seicho')pl.nisa.yS+=cost;
+   pl.trades++;ok(`${ACCT[a]}で${s.name}を${qty}株買いました（${yen(cost+fe)}${fe?`、うち手数料 ${yen(fe)}`:''}）`);
+ }else{
+   const h=pl.hold[k];if(!h||h.sh<qty-1e-9)return err(`${ACCT[a]}に持っている数（${h?fsh(h.sh):0}）より多くは売れません`);
+   const amt=qty*p,fe=amt*f,avg=h.cost/h.sh,pnl=amt-fe-avg*qty;
+   pl.cash+=amt-fe;pl.fees+=fe;
+   let extra='';
+   if(a==='tok'){const d=realize(pl,pnl);if(d>.5)extra=`、税金 ${yen(d)} を差し引き`;else if(d<-.5)extra=`、今年払った税金から ${yen(-d)} が戻った`}
+   else{if(pnl>0){pl.tax.saved+=pnl*TAX;extra=`、NISAなので税金0円（特定口座なら${yen(pnl*TAX)}）`}else if(pnl<0)extra='、NISAの損失は他の利益と相殺できない';
+     if(a==='tsumi')pl.nisa.pendT+=avg*qty;else pl.nisa.pendS+=avg*qty}
+   h.cost-=avg*qty;h.sh-=qty;if(h.sh<1e-9)delete pl.hold[k];
+   pl.trades++;ok(`${s.name}を${fsh(qty)}株売りました。損益 ${sgnYen(pnl)}${extra}`);
+ }
+ persist(MEID);render();
+}
+function maxBuy(){const pl=ME,s=S[ui.sel],a=ui.acct,p=pxJ(s.id);
+ return Math.max(0,Math.floor(Math.min(pl.cash/(p*(1+feeOf(s,a))),a==='tok'?Infinity:nisaRoom(pl,a)/p)))}
+function err(m){ui.msg=m;ui.err=true;render()}
+function ok(m){ui.msg=m;ui.err=false}
+
+/* ===================== 画面 ===================== */
+const app=document.getElementById('app');
+const GAME='浦島太郎投資伝説';
+function render(){if(!ROOM||!G)return renderLobby();if(isOver())return renderEnd();if(!ME)return;renderGame()}
+
+function renderLobby(){
+ const saved=localSaved(),ss=sessions(),hashCode=(location.hash||'').slice(1).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
+ const canOnline=!!(FIREBASE_CONFIG||window.__TEST_BUS__);
+ const tab=ui.lobbyTab||(hashCode?'join':'join');
+ const tick=STOCKS.slice(0,12).map(s=>{const u=Math.random()<.55;return `<span>${s.name} <span class="${u?'up':'down'}">${u?'▲':'▼'}</span></span>`}).join('');
+ const opts=`<div class="field"><label for="cash">元手</label><select id="cash"><option value="1000000">100万円</option><option value="3000000" selected>300万円</option><option value="10000000">1000万円</option></select></div>
+   <div class="field"><label for="len">期間</label><select id="len"><option value="12">半年（12ターン）</option><option value="24">1年（24ターン）</option><option value="72" selected>3年（72ターン）</option><option value="120">5年（120ターン）</option></select></div>
+   <div class="field"><label class="chk"><input type="checkbox" id="coach" checked>最初の10ターン（5ヶ月）は投資のヒントを出す</label></div>`;
+ app.innerHTML=`<div class="wrap setup">
+  <div class="hero"><h1>${GAME}</h1><p>亀に連れられてやってきた竜宮城の取引所。どこかで見たような会社の株を売り買いして、地上に戻る日までに資産を増やそう。会社の利益と市場の気分で株価が動き、景気の波や事件も起きる。</p>
+  <div class="ticker">${tick}</div></div>
+  ${ui.lobbyMsg?`<p class="msg err" role="alert">${esc(ui.lobbyMsg)}</p>`:''}
+  ${canOnline&&ss.length?`<div class="card"><h2>前回の部屋に戻る</h2><div class="sess">${ss.map((s,i)=>`<button class="btn ghost" data-sess="${i}">${esc(s.name)}　<span class="num">${s.code}</span></button>`).join('')}</div></div>`:''}
+  <div class="card">
+   <h2>友達と遊ぶ（オンライン）</h2>
+   ${canOnline?`<div class="seg" role="group" aria-label="参加方法"><button data-lt="join" aria-pressed="${tab==='join'}">部屋に入る</button><button data-lt="make" aria-pressed="${tab==='make'}">部屋を作る</button></div>
+   ${tab==='join'?`<p class="desc">誘ってくれた人から部屋コードを聞いて入ろう。2回目以降も、同じ名前と合言葉で自分の口座に戻れる。</p>
+    <div class="field"><label for="jc">部屋コード（6文字）</label><input id="jc" class="txt num" maxlength="6" autocomplete="off" value="${esc(hashCode)}"></div>`
+   :`<p class="desc">部屋を作ると部屋コードと招待リンクが出る。それを友達に送ろう。部屋を作った人は、来ない人を待たずにターンを進められる。</p>`}
+    <div class="names"><div class="field"><label for="jn">名前（12文字まで）</label><input id="jn" class="txt" maxlength="12" autocomplete="nickname"></div>
+    <div class="field"><label for="jp">合言葉（数字4桁）</label><input id="jp" class="txt num" inputmode="numeric" maxlength="4" autocomplete="off"></div></div>
+    ${tab==='make'?opts:''}
+    <button class="go" id="online" ${ui.busy?'disabled':''}>${tab==='join'?'部屋に入る':'部屋を作る'}</button>
+    <p class="hint">合言葉は、ほかの人がうっかり同じ名前で入らないためのもの。銀行の暗証番号などは使わないでください。</p>`
+   :`<p class="desc">オンライン対戦の準備がまだできていません（サーバーの設定待ち）。今は下の「1台で遊ぶ」で遊べます。</p>`}
+  </div>
+  <div class="card">
+   <h2>1台で遊ぶ</h2>
+   ${saved&&!(saved.t>=saved.total)?`<p class="desc">続きがあります：${dstr(saved.t)}・${Object.values(saved.members).map(m=>esc(m.name)).join('、')}</p><button class="btn buy" id="resume">続きから遊ぶ</button><h3>新しく始める</h3>`:''}
+   <div class="field"><label for="np">人数（1台を交代で回す）</label><select id="np"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+   <div class="field"><label>名前</label><div class="names" id="names"></div></div>
+   ${tab==='make'&&canOnline?opts.replace(/id="(cash|len|coach)"/g,'id="l$1"').replace(/for="(cash|len)"/g,'for="l$1"'):opts.replace(/id="(cash|len|coach)"/g,'id="l$1"').replace(/for="(cash|len)"/g,'for="l$1"')}
+   <button class="go" id="start">取引開始</button>
+  </div>
+  <div class="card rules"><h2>ルール</h2><ul>
+   <li>1ターン＝2週間。1ヶ月は前半・後半の2ターン。上のすごろく盤が1年分の暦になっている。</li>
+   <li>売買は何度でもできる。全員が「このターンを終える」を押すと相場が2週間ぶん動き、ニュースが届く。大事件は号外で届く。</li>
+   <li>株価は「会社の利益」×「市場の気分（PER）」で決まる。利益は成長と景気の波で動き、気分は行き過ぎても時間をかけて平均に戻る。</li>
+   <li>口座は特定口座とNISA。特定口座では売却益と配当に20.315%の税金がかかり、NISAなら非課税。</li>
+   <li>日本株の手数料は0円、米国株は0.45%（NISAなら0円）、金は0.5%。米国株と金はドル建てなので円相場でも損益が変わる。</li>
+   <li>資産が元手の1割を下回ると破産して退場。最後に資産が一番多い人の勝ち。上昇は赤、下落は青。</li>
+  </ul>
+  <p class="hint">このゲームは非営利の学習用です。登場する会社名・株価・ニュースはすべて架空のもので、実在の企業や団体とは関係ありません。実際の投資判断には使わないでください。</p></div></div>`;
+ const $=id=>document.getElementById(id);
+ app.querySelectorAll('[data-lt]').forEach(b=>b.onclick=()=>{ui.lobbyTab=b.dataset.lt;ui.lobbyMsg='';renderLobby()});
+ app.querySelectorAll('[data-sess]').forEach(b=>b.onclick=async()=>{ui.busy=true;try{await resumeOnline(ss[+b.dataset.sess])}catch(e){ui.busy=false;ui.lobbyMsg=e.message;renderLobby()}ui.busy=false});
+ const np=$('np'),box=$('names');
+ const drawNames=()=>{const n=+np.value,cur=[...box.querySelectorAll('input')].map(i=>i.value);
+   box.innerHTML=Array.from({length:n},(_,i)=>`<input id="pn${i}" class="txt" maxlength="12" aria-label="プレイヤー${i+1}の名前" value="${esc(cur[i]||'プレイヤー'+(i+1))}">`).join('')};
+ np.onchange=drawNames;drawNames();
+ $('start').onclick=()=>{
+   const names=[...box.querySelectorAll('input')].map((i,k)=>i.value.trim()||'プレイヤー'+(k+1));
+   if(new Set(names).size!==names.length){ui.lobbyMsg='名前が重なっています。全員ちがう名前にしてください。';return renderLobby()}
+   ui.lobbyMsg='';createLocal({names,cash:+$('lcash').value,turns:+$('llen').value,coach:$('lcoach').checked})};
+ const rs=$('resume');if(rs)rs.onclick=()=>{const r=localSaved();enter('local',localStore(),'LOCAL',membersFrom(r))};
+ const on=$('online');if(on)on.onclick=async()=>{
+   const name=$('jn').value.trim(),pin=$('jp').value.trim();
+   if(!validName(name)){ui.lobbyMsg='名前を1〜12文字で入れてください。';return renderLobby()}
+   if(!validPin(pin)){ui.lobbyMsg='合言葉は数字4桁で入れてください。';return renderLobby()}
+   ui.busy=true;ui.lobbyMsg='';on.disabled=true;on.textContent='接続しています…';
+   try{
+     if(tab==='join'){const code=$('jc').value.trim().toUpperCase();if(code.length!==6)throw new Error('部屋コードは6文字です。');await joinOnline({code,name,pin})}
+     else await createOnline({name,pin,cash:+$('cash').value,turns:+$('len').value,coach:$('coach').checked});
+   }catch(e){console.error(e);ui.lobbyMsg=e.message==='no-config'?'オンライン対戦の準備がまだできていません。':/permission|network|unavailable|Failed to fetch/i.test(String(e.message))?'サーバーにつながりませんでした。少しおいてもう一度試してください。':e.message;ui.busy=false;renderLobby()}
+   ui.busy=false;
+ };
+}
+const membersFrom=r=>Object.entries(r.members).sort((a,b)=>a[1].order-b[1].order).map(([id])=>id);
+
+function trackHTML(){
+ const y0=Math.floor(G.t/24)*24,sq=[],ms=membersOrdered();
+ for(let t=y0;t<y0+24;t++){
+   const d=dateOf(t),cls=t<G.t?'past':t===G.t?'now':'';
+   const earnJP=EARN_MONTHS.JP.includes(d.m),earnUS=EARN_MONTHS.US.includes(d.m);
+   const b=[];
+   if(earnJP||earnUS)b.push(`<span class="bd e" title="${earnJP?'日本株':'米国株'}の決算">決</span>`);
+   if(d.w===2&&d.m%3===0)b.push(`<span class="bd d" title="配当の権利確定">配</span>`);
+   if(d.m===1&&d.w===1)b.push(`<span class="bd n" title="NISAの年間枠リセット">枠</span>`);
+   const mk=G.marks[t]&&t<=G.t&&t>0?`<span class="ev ${G.marks[t].mood||''}" title="${esc(G.marks[t].title)}">${esc(G.marks[t].tag)}</span>`:'';
+   const tk=t===G.t?`<span class="tok">${ms.filter(m=>!m.bust).slice(0,6).map(m=>`<i style="background:${COLS[m.color%COLS.length]}" title="${esc(m.name)}">${esc([...m.name][0]||'?')}</i>`).join('')}</span>`:'';
+   sq.push(`<li class="sq ${cls} ${t===G.t&&ui.land?'land':''}" aria-current="${t===G.t?'step':'false'}"><span class="mo">${d.m}月</span><span class="hf">${HALF(d.w)}</span><div>${b.join('')}</div>${mk}${tk}</li>`);
+ }
+ // 前半（1〜6月）を左から右、後半（7〜12月）を右から左へ並べて、すごろくの蛇行にする
+ const narrow=window.innerWidth<=640;
+ const order=narrow?[...sq.slice(0,6),...sq.slice(6,12).reverse(),...sq.slice(12,18),...sq.slice(18).reverse()]:[...sq.slice(0,12),...sq.slice(12).reverse()];
+ return `<section class="track" aria-label="今年のすごろく盤"><div class="yrlabel">${dateOf(G.t).y}年のすごろく盤　地上に戻るまであと${ROOM.total-G.t}ターン</div><ol>${order.join('')}</ol>
+ <div class="trackleg"><span><b>決</b> 決算シーズン</span><span><b>配</b> 配当の権利確定</span><span><b>枠</b> NISA枠リセット</span><span>マスの下の文字は、そのターンに起きた出来事</span></div></section>`;
+}
+function stripHTML(){
+ const ms=membersOrdered();if(ms.length<2&&MODE==='local')return '';
+ return ms.map(m=>{const p=PLAYERS[m.id];const v=p?value(p):ROOM.cash,st=p?p.start:ROOM.cash;
+   const status=m.bust?'破産':ROOM.ready[m.id]?'完了':m.id===MEID?(MODE==='local'?'取引中':'あなた'):'取引中';
+   return `<div class="pl ${m.id===MEID?'on':''} ${m.bust?'bust':''} ${ROOM.ready[m.id]?'done':''}"><b><span class="dot" style="background:${COLS[m.color%COLS.length]}"></span>${esc(m.name)}<span class="st">${status}</span></b><span class="v">${yen(v)}</span> ${pcs(v/st-1)}</div>`}).join('');
+}
+function barHTML(){
+ const pl=ME,alive=aliveIds(),done=alive.filter(id=>ROOM.ready[id]).length,mine=!!ROOM.ready[MEID];
+ const last=G.t+1>=ROOM.total;
+ let action;
+ if(pl.bust)action=`<span class="wait">破産したため観戦中</span>`;
+ else if(MODE==='local'){const others=alive.filter(id=>id!==MEID&&!ROOM.ready[id]).length;
+   action=`<button class="go" id="next">${others?'取引終了、次の人へ':last?'最終ターンを終える':'次のターンへ'}</button>`}
+ else if(mine){action=`<span class="wait">ほかの人を待っています（${alive.length}人中${done}人が完了）</span><button class="btn ghost" id="undo">取り消す</button>${ROOM.host===MEID&&done<alive.length?'<button class="btn dark" id="force">待たずに進める</button>':''}`}
+ else action=`<button class="go" id="next">${last?'最終ターンを終える':'このターンを終える'}</button>`;
+ return `<span class="who">${MODE==='local'&&membersOrdered().length>1?`<span class="dot" style="background:${COLS[pl.color%COLS.length]}"></span> ${esc(pl.name)}の番`:esc(pl.name)}</span>
+  <span>現金 <span class="cash">${yen(pl.cash)}</span></span>
+  <span>資産合計 <span class="cash">${yen(value(pl))}</span> ${pcs(value(pl)/pl.start-1)}</span>
+  ${ui.netErr?`<span class="msg err">${esc(ui.netErr)}</span>`:''}
+  <span class="spacer"></span>${action}`;
+}
+function renderBarOnly(){
+ const bar=document.getElementById('bar'),strip=document.getElementById('strip');
+ if(!bar||!ME||!ROOM||isOver())return render();
+ bar.innerHTML=barHTML();if(strip)strip.innerHTML=stripHTML();bindBar();
+}
+function bindBar(){
+ const $=id=>document.getElementById(id);
+ if($('next'))$('next').onclick=endTurn;
+ if($('undo'))$('undo').onclick=undoEnd;
+ if($('force'))$('force').onclick=()=>advance(true);
+}
+
+function renderGame(){
+ const d=dateOf(G.t),pl=ME;
+ const fxCh=G.fx/G.fxH[G.fxH.length-2]-1;
+ const view=ui.view==='market'?marketView():ui.view==='nisa'?nisaView(pl):tradeView(pl);
+ const link=location.origin+location.pathname+'#'+ROOM.code;
+ app.innerHTML=`<div class="wrap">
+ <header class="top">
+  <h1 class="logo">${GAME}</h1>
+  <div class="date">${d.y}年${d.m}月 ${HALF(d.w)}</div>
+  <span class="pill ${G.cyc.phase==='rec'?'warn':''}">景気：${G.cyc.phase==='rec'?'後退局面':'拡大局面'}</span>
+  ${G.regime?'<span class="pill bad">危機モード：値動き荒め</span>':''}
+  <span class="num">1ドル＝${G.fx.toFixed(2)}円 ${pcs(fxCh)}</span>
+  <span class="spacer"></span>
+  ${MODE==='online'?`<span class="code">部屋 <b class="num">${ROOM.code}</b></span><button class="linkbtn" id="copy">${ui.copied?'コピーしました':'招待リンクをコピー'}</button>`:''}
+  <button class="linkbtn" id="hint">ヒント</button>
+  <button class="linkbtn" id="quit">${ui.quitArm?(MODE==='online'?'もう一度押すと退出（口座は残ります）':'もう一度押すとトップへ（進行は保存されます）'):(MODE==='online'?'退出':'やめてトップへ')}</button>
+ </header>
+ ${ui.showLink?`<p class="hint">招待リンク：<span class="num sel">${esc(link)}</span></p>`:''}
+ ${trackHTML()}
+ <div class="players" id="strip">${stripHTML()}</div>
+ <nav class="nav" aria-label="画面の切り替え">${[['trade','売買'],['market','相場の歴史'],['nisa','NISA・税金']].map(([k,l])=>`<button data-v="${k}" aria-pressed="${ui.view===k}">${l}</button>`).join('')}</nav>
+ ${view}
+ <div class="bar" id="bar">${barHTML()}</div></div>
+ ${ui.extra?extraHTML(ui.extra):''}`;
+ bindCommon();bindBar();
+ if(ui.view==='trade')bindTrade(pl);
+ if(ui.view==='nisa')bindNisa(pl);
+ drawCharts();
+}
+function bindCommon(){
+ const $=id=>document.getElementById(id);
+ app.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ui.view=b.dataset.v;render()});
+ $('quit').onclick=()=>{if(!ui.quitArm){ui.quitArm=true;render();return}ui.quitArm=false;quit()};
+ $('hint').onclick=()=>{const showing=!!document.querySelector('.coach');ui.view='trade';ui.coachOpen=!showing;if(showing&&!ME.coachOff){ME.coachOff=true;persist(MEID)}ui.lesson=null;render()};
+ if($('copy'))$('copy').onclick=()=>{const link=location.origin+location.pathname+'#'+ROOM.code;
+   const done=()=>{ui.copied=true;render();setTimeout(()=>{ui.copied=false;if(document.getElementById('copy'))document.getElementById('copy').textContent='招待リンクをコピー'},2000)};
+   try{navigator.clipboard.writeText(link).then(done,()=>{ui.showLink=true;render()})}catch(e){ui.showLink=true;render()}};
+ const x=$('extraok');if(x){x.onclick=()=>{ui.extra=null;render()};x.focus()}
+ app.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{ui.sel=b.dataset.pick;ui.view='trade';ui.msg='';ui.qty='';ui.extra=null;render()});
+}
+function extraHTML(n){
+ return `<div class="extra" role="dialog" aria-modal="true" aria-labelledby="extrah"><div class="paper">
+  <div class="gougai">号外</div>
+  <div><p class="src">${dstr(G.t)}　竜宮新報</p><h2 id="extrah">${esc(n.title)}</h2>
+  ${n.moves&&n.moves.length?`<div class="moves">${n.moves.map(m=>`<span>${S[m.id].name} ${pcs(m.pct)}</span>`).join('')}</div>`:''}
+  <p>${n.explain}</p>${n.prec?`<p class="src">現実の例：${n.prec}</p>`:''}
+  <button class="btn" id="extraok">読んだ</button></div></div></div>`;
+}
+
+/* ===================== 終了画面（玉手箱） ===================== */
+function maxDD(h){let pk=h[0],dd=0;for(const v of h){pk=Math.max(pk,v);dd=Math.min(dd,v/pk-1)}return dd}
+function renderEnd(){
+ const ms=membersOrdered().filter(m=>PLAYERS[m.id]);
+ const fin=m=>{const p=PLAYERS[m.id];return p.t>=G.t?p.hist[p.hist.length-1]:value(p)};
+ const ranked=ms.map(m=>({m,p:PLAYERS[m.id],v:fin(m)})).sort((a,b)=>b.v-a.v);
+ const yrs=r=>Math.max((G.t-r.p.joinT)/24,.01);
+ if(!ui.opened){
+   app.innerHTML=`<div class="wrap setup"><div class="hero box-hero"><h1>地上に戻る日が来た</h1><p>${dstr(G.t)}。竜宮城で過ごした${(G.t/24).toFixed(1).replace('.0','')}年のあいだに、あなたの資産はどうなっただろう。</p>
+    <button class="go gold" id="open">玉手箱を開ける</button></div></div>`;
+   document.getElementById('open').onclick=()=>{ui.opened=true;render()};return;
+ }
+ const lessons=r=>{
+   const p=r.p,v=r.v,ret=v/p.start-1,bench=benchOf(p)/p.start-1,dd=maxDD(p.hist),out=[];
+   out.push(ret>=bench?`同じ期間インデックスを放置した場合（${pc(bench)}）に勝った。プロの運用者でも長期でインデックスに勝ち続けられるのは少数派なので、これは立派な成績。`:`同じ期間インデックスを放置した場合（${pc(bench)}）に負けた。実は多くのプロも同じで、「全体を買って放置」は手強い相手。`);
+   out.push(`最大で ${pc(dd)} の下落を経験した。${dd<-.3?'これだけ減ると精神的にきつく、現実では投げ売りしがち。分散やインデックスの比率で揺れを抑える手もある。':'下落を小さめに抑えられた。'}`);
+   out.push(`売買は${p.trades}回、手数料は合計${yen(p.fees)}、特定口座で払った税金は${yen(p.tax.total)}。NISAのおかげで払わずに済んだ税金は${yen(p.tax.saved)}。`);
+   if(p.divs)out.push(`配当で${yen(p.divs)}受け取った。値上がりだけでなく配当も長期のリターンを支える。`);
+   if(p.bust)out.push('破産で退場。一度の大きな損失を取り返すのは難しい。1銘柄への集中は避けたい。');
+   return out;
+ };
+ const L=G.t+1,benchLine=Array.from({length:L},(_,t)=>ROOM.cash*G.tri[t+PRE]/G.tri[PRE]);
+ const series=[...ranked.map(r=>({d:Array.from({length:L},(_,t)=>t<r.p.joinT?null:(r.p.hist[t-r.p.joinT]??null)),c:COLS[r.m.color%COLS.length]})),{d:benchLine,c:'var(--muted)',dash:1}];
+ const c=chart('end',{label:'資産の推移',h:240,series,xl:i=>i%24===0?dstr(i).slice(0,5):null,
+   tip:i=>`<b>${dstr(i)}</b>`+ranked.map((r,k)=>series[k].d[i]!=null?`<br>${esc(r.m.name)} ${man(series[k].d[i])}`:'').join('')+`<br>インデックス放置 ${man(benchLine[i])}`});
+ app.innerHTML=`<div class="wrap" style="max-width:880px">
+  <header class="top"><h1 class="logo">${GAME}</h1><div class="date">玉手箱の中身<small>${G.t}ターン（${(G.t/24).toFixed(1).replace('.0','')}年）</small></div><span class="spacer"></span><button class="linkbtn" id="quit">トップへ</button></header>
+  <div class="card"><h2>最終結果</h2><div class="tbl">
+   <table class="rank"><thead><tr><th>順位</th><th>名前</th><th>最終資産</th><th>損益</th><th>リターン</th><th>年率</th><th>インデックス放置</th></tr></thead><tbody>
+   ${ranked.map((r,k)=>`<tr><td>${k+1}</td><td><span class="dot" style="background:${COLS[r.m.color%COLS.length]}"></span> ${esc(r.m.name)}${r.p.bust?'（破産）':''}${r.p.joinT?`<span class="hint">（${dstr(r.p.joinT)}から参加）</span>`:''}</td><td class="num">${yen(r.v)}</td><td>${sgnYen(r.v-r.p.start)}</td><td class="num">${pcs(r.v/r.p.start-1)}</td><td class="num">${pcs(Math.pow(Math.max(r.v,1)/r.p.start,1/yrs(r))-1)}</td><td class="num">${pcs(benchOf(r.p)/r.p.start-1)}</td></tr>`).join('')}
+   </tbody></table></div>
+   <p class="hint">「インデックス放置」は、その人が参加したときに元手を全部日本株インデックスに入れて、配当も再投資しながら何もしなかった場合。</p></div>
+  <div class="card"><h2>資産の推移</h2>${c}
+   <div class="legend">${ranked.map(r=>`<span><i style="border-color:${COLS[r.m.color%COLS.length]}"></i>${esc(r.m.name)}</span>`).join('')}<span><i class="dash" style="border-color:var(--muted)"></i>インデックス放置</span></div></div>
+  ${ranked.map(r=>`<div class="card"><h2>${esc(r.m.name)}の振り返り</h2>${lessons(r).map(l=>`<p class="lesson">${l}</p>`).join('')}</div>`).join('')}
+ </div>`;
+ document.getElementById('quit').onclick=()=>{ui.opened=false;quit()};
+ drawCharts();
+}
+
+/* ---------- 売買 ---------- */
+function tradeView(pl){
+ const n=idxNow();
+ const list=STOCKS.filter(s=>ui.filter==='all'||(ui.filter==='JP'&&s.c==='JP'&&s.sec!=='index')||(ui.filter==='US'&&s.c==='US'&&NONIDX(s))||(ui.filter==='etc'&&!NONIDX(s))||(ui.filter==='mine'&&holdOf(pl,s.id)));
+ const rows=list.map(s=>{
+   const ch=pxJ(s.id)/pxJh(s.id,n-1)-1,jh=Array.from({length:25},(_,k)=>pxJh(s.id,n-24+k)),mine=holdOf(pl,s.id);
+   const pe=s.sec==='gold'?'—':perNow(s.id).toFixed(1),rel=s.sec==='gold'?0:perNow(s.id)/s.pm;
+   return `<tr class="row ${ui.sel===s.id?'sel':''}" data-id="${s.id}" tabindex="0">
+    <td><span class="nm">${s.name}</span><span class="sec">${SECTORS[s.sec]}・${s.c==='JP'?'日本':'米国'}</span></td>
+    <td><span class="px">${fp(pxJ(s.id))}</span>${s.c==='US'?`<span class="usd">$${G.st[s.id].p.toFixed(2)}</span>`:''}</td>
+    <td class="num">${pcs(ch)}</td>
+    <td>${spark(jh,70,24,jh[24]>=jh[0]?'var(--upL)':'var(--downL)')}</td>
+    <td class="pe ${rel>1.25?'hi':rel&&rel<.8?'lo':''}">${pe}</td>
+    <td class="held">${mine?fsh(mine.sh):''}</td></tr>`}).join('');
+ return `<div class="main">
+  <section class="board" aria-label="株価ボード">
+   <div class="tabs" role="group" aria-label="絞り込み">${[['all','すべて'],['JP','日本株'],['US','米国株'],['etc','インデックス・金'],['mine','保有中']].map(([k,l])=>`<button data-f="${k}" aria-pressed="${ui.filter===k}">${l}</button>`).join('')}</div>
+   <div class="tbl"><table><thead><tr><th>銘柄</th><th>株価（円）</th><th>前回比</th><th>1年</th><th title="株価が1株利益の何倍か">PER</th><th>保有</th></tr></thead><tbody>${rows||'<tr><td colspan="6">まだ何も持っていません。気になる銘柄を選んで買ってみよう。</td></tr>'}</tbody></table></div>
+   <p class="hint" style="color:var(--ledmute);padding:0 4px 6px">PERが赤いのは過去平均よりかなり高い（割高気味）、青いのはかなり低い（割安気味）銘柄。</p>
+  </section>
+  <aside>${coachCard(pl)}${stockCard(pl)}${newsCard()}</aside></div>`;
+}
+function stockCard(pl){
+ const s=S[ui.sel],x=G.st[s.id],pJ=pxJ(s.id),gold=s.sec==='gold',{off,len}=windowOf(ui.range);
+ const conv=i=>s.c==='US'?G.fxH[i]:1;
+ const price=Array.from({length:len},(_,k)=>pxJh(s.id,off+k));
+ const theo=gold?null:Array.from({length:len},(_,k)=>x.e[off+k]*s.pm*conv(off+k));
+ const marks=x.ev.filter(e=>e.t+PRE>=off).map(e=>({i:e.t+PRE-off,label:`${dstr(e.t)} ${e.title}`}));
+ const vline=PRE-off;
+ const cid='stk';
+ const ch=chart(cid,{label:`${s.name}の株価チャート`,h:210,series:[{d:price,c:'var(--up)',n:'株価'},...(theo?[{d:theo,c:'var(--muted)',dash:1,w:1.5}]:[])],
+   shade:G.cycH.slice(off,off+len),marks,xl:yearXL(off),vline,
+   tip:i=>`<b>${dstr(tAt(off+i))}</b><br>株価 ${fp(price[i])}円${theo?`<br>理論株価の目安 ${fp(theo[i])}円`:''}`});
+ const hs=holds(pl).filter(h=>h.id===s.id),hTot=holdOf(pl,s.id);
+ const q=x.q.slice(-8),qmax=Math.max(...q.map(r=>r.eps),1e-9);
+ const g3=gold?null:growth3(s.id);
+ const room=ui.acct==='tok'?null:nisaRoom(pl,ui.acct);
+ return `<div class="card">
+  <h2>${s.name}</h2><p class="desc">${s.desc}</p>
+  <div class="rng" role="group" aria-label="期間">${[[24,'1年'],[72,'3年'],['all','全期間']].map(([k,l])=>`<button data-r="${k}" aria-pressed="${String(ui.range)===String(k)}">${l}</button>`).join('')}</div>
+  ${ch}
+  <div class="legend"><span><i style="border-color:var(--up)"></i>株価</span>${gold?'':'<span><i class="dash" style="border-color:var(--muted)"></i>理論株価の目安（1株利益×平均PER）</span>'}<span><i class="box" style="background:var(--shade)"></i>景気後退期</span><span><i class="box" style="background:var(--shade2)"></i>危機</span><span><i class="box" style="background:var(--gold);width:8px;border-radius:50%"></i>出来事</span></div>
+  <div class="stats">
+   <div><span>株価</span><span>${fp(pJ)}円</span></div>
+   <div><span>PER（平均）</span><span>${gold?'—':`${x.per.toFixed(1)}倍（${s.pm}倍）`}</span></div>
+   <div><span>利益の伸び（年率）</span><span>${g3==null?'—':pc(g3)}</span></div>
+   <div><span>配当利回り</span><span>${(s.y*100).toFixed(1)}%</span></div>
+   <div><span>次の決算</span><span>${nextEarn(s)}</span></div>
+   <div><span>値動きの荒さ</span><span>${s.v>=.4?'激しい':s.v>=.28?'大きめ':s.v>=.18?'ふつう':'小さめ'}</span></div>
+   <div><span>景気への敏感さ</span><span>${gold?'—':s.cy>=1.2?'高い':s.cy<=.5?'低い':'ふつう'}</span></div>
+   <div><span>手数料</span><span>${(fee(s)*100).toFixed(2)}%${s.c==='US'&&!gold?'（NISA 0%）':''}</span></div>
+  </div>
+  ${q.length?`<h3>業績の記録（1株利益）</h3><div class="earn" aria-label="過去の決算">${q.map(r=>{const d=dateOf(r.t);return `<div title="${dstr(r.t)}：${r.sur==='beat'?'予想を上回った':r.sur==='miss'?'予想を下回った':'ほぼ予想通り'}${r.yoy!=null?`、前年比 ${pc(r.yoy)}`:''}"><span>${r.yoy!=null?pc(r.yoy):''}</span><b class="${r.sur}" style="height:${Math.max(4,r.eps/qmax*56)}px"></b><span>${String(d.y).slice(2)}/${d.m}</span></div>`}).join('')}</div>
+   <p class="hint">赤は予想を上回った決算、青は下回った決算。上の数字は前年同期比。</p>`:''}
+  ${hTot?`<div class="holds">${hs.map(h=>`<span>${ACCT[h.a]} ${fsh(h.sh)}株・損益 ${sgnYen(h.sh*pJ-h.cost)}</span>`).join('')}</div>`:''}
+  <div class="seg" role="group" aria-label="口座">${['tok','seicho','tsumi'].map(a=>`<button data-a="${a}" aria-pressed="${ui.acct===a}" ${acctOK(s,a)?'':'disabled'}>${ACCT[a]}</button>`).join('')}</div>
+  ${room!=null?`<p class="hint">${ACCT[ui.acct]}の残り枠 ${yen(room)}。利益も配当も非課税。</p>`:'<p class="hint">特定口座：売却益と配当に20.315%の税金（自動で差し引き）。</p>'}
+  <div class="trade">
+   <input id="qty" type="number" min="1" step="1" inputmode="numeric" placeholder="株数" value="${esc(ui.qty)}" aria-label="株数">
+   <button class="btn buy" id="buy">買う</button>
+   <button class="btn sell" id="sell" ${pl.hold[ui.acct+':'+s.id]?'':'disabled'}>売る</button>
+   <button class="btn ghost" id="max">買える最大</button>
+   ${pl.hold[ui.acct+':'+s.id]?'<button class="btn ghost" id="all">この口座の分を全部売る</button>':''}
+  </div>
+  <div class="msg ${ui.err?'err':''}" role="status">${ui.msg}</div>
+ </div>`;
+}
+function newsCard(){
+ const my=(ME.notes||[]).map(t=>`<li class="me"><span class="tag">あなたの口座</span><span class="ttl">${esc(t)}</span></li>`).join('');
+ return `<div class="card"><h2>この2週間のニュース</h2><ul class="news">${my}${curNews().map(n=>newsItem(n)).join('')}</ul>
+  <details ${ui.showLog?'open':''} id="logd"><summary>これまでのニュース</summary><ul class="news" style="margin-top:8px">${G.log.filter(x=>x.t<G.t).map(x=>newsItem(x,true)).join('')||'<li>まだありません</li>'}</ul></details></div>`;
+}
+function newsItem(x,old){
+ return `<li class="${x.mood||''}"><span class="tag">${x.tag}${old?`・${dstr(x.t)}`:''}</span><span class="ttl">${x.title}</span>
+ ${x.moves&&x.moves.length?`<div class="moves">${x.moves.map(m=>`<span>${S[m.id].name} ${pcs(m.pct)}</span>`).join('')}${x.fxMove?`<span>円相場 ${x.fxMove>0?'円安':'円高'}</span>`:''}</div>`:''}
+ ${x.explain?`<details><summary>なぜ動いた？</summary><p style="margin:4px 0">${x.explain}</p>${x.prec?`<p class="prec">現実の例：${x.prec}</p>`:''}</details>`:''}</li>`;
+}
+function bindTrade(pl){
+ app.querySelectorAll('tr.row').forEach(r=>{const go=()=>{ui.sel=r.dataset.id;ui.msg='';ui.qty='';if(!acctOK(S[ui.sel],ui.acct))ui.acct='tok';render()};r.onclick=go;r.onkeydown=e=>{if(e.key==='Enter')go()}});
+ app.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ui.filter=b.dataset.f;render()});
+ app.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{ui.range=b.dataset.r==='all'?'all':+b.dataset.r;render()});
+ app.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{ui.acct=b.dataset.a;ui.msg='';render()});
+ const q=document.getElementById('qty');q.oninput=()=>ui.qty=q.value;
+ document.getElementById('buy').onclick=()=>trade('buy',+q.value);
+ document.getElementById('sell').onclick=()=>trade('sell',+q.value);
+ document.getElementById('max').onclick=()=>{ui.qty=String(maxBuy());render()};
+ const al=document.getElementById('all');if(al)al.onclick=()=>trade('sell',pl.hold[ui.acct+':'+ui.sel].sh);
+ document.getElementById('logd').ontoggle=e=>ui.showLog=e.target.open;
+ app.querySelectorAll('[data-cl]').forEach(b=>b.onclick=()=>{const cur=ui.lesson??Math.min(Math.max(G.t-ME.joinT,0),LESSONS-1);ui.lesson=Math.max(0,Math.min(LESSONS-1,cur+ +b.dataset.cl));render()});
+ const cx=document.getElementById('coachx');if(cx)cx.onclick=()=>{ME.coachOff=true;ui.coachOpen=false;persist(MEID);render()};
+}
+
+/* ---------- 相場の歴史 ---------- */
+function marketView(){
+ const {off,len}=windowOf(ui.mrange),n=idxNow();
+ const norm=id=>{const b=pxJh(id,off);return Array.from({length:len},(_,k)=>pxJh(id,off+k)/b*100)};
+ const jp=norm('jpidx'),us=norm('usidx');
+ const marks=G.major.filter(m=>m.t+PRE>=off).map(m=>({i:m.t+PRE-off,label:`${dstr(m.t)} ${m.title}`}));
+ const c1=chart('mkt',{label:'日本株と米国株の長期推移',h:240,series:[{d:jp,c:'var(--up)'},{d:us,c:'var(--down)'}],shade:G.cycH.slice(off,off+len),marks,xl:yearXL(off),vline:PRE-off,fmt:v=>v.toFixed(0),
+   tip:i=>`<b>${dstr(tAt(off+i))}</b><br>日本株 ${jp[i].toFixed(1)}<br>米国株（円換算） ${us[i].toFixed(1)}`});
+ const fx=G.fxH.slice(off,off+len);
+ const c2=chart('fx',{label:'ドル円の推移',h:150,series:[{d:fx,c:'var(--gold)'}],shade:G.cycH.slice(off,off+len),xl:yearXL(off),vline:PRE-off,fmt:v=>v.toFixed(0),tip:i=>`<b>${dstr(tAt(off+i))}</b><br>1ドル＝${fx[i].toFixed(2)}円`});
+ const r1=id=>pxJ(id)/pxJh(id,Math.max(0,n-24))-1;
+ const cyc=STOCKS.filter(s=>NONIDX(s)&&s.cy>=1.2),def=STOCKS.filter(s=>NONIDX(s)&&s.cy<=.6);
+ const rec=G.cyc.phase==='rec',mo=Math.round(G.cyc.age/2);
+ const recs=[];let st=-1;G.cycH.forEach((v,i)=>{if(v&&st<0)st=i;if(!v&&st>=0){recs.push([st,i-1]);st=-1}});if(st>=0)recs.push([st,G.cycH.length-1]);
+ return `<div class="cols2">
+  <div class="card" style="grid-column:1/-1"><h2>日本株と米国株の長い波</h2>
+   <p class="desc">期間の最初を100としたインデックスの動き。米国株は円に直した値。点線より左はゲーム開始前の歴史。</p>
+   <div class="rng" role="group" aria-label="期間">${[[72,'3年'],[120,'5年'],['all','全期間']].map(([k,l])=>`<button data-mr="${k}" aria-pressed="${String(ui.mrange)===String(k)}">${l}</button>`).join('')}</div>
+   ${c1}
+   <div class="legend"><span><i style="border-color:var(--up)"></i>日本株インデックス</span><span><i style="border-color:var(--down)"></i>全米株インデックス（円換算）</span><span><i class="box" style="background:var(--shade)"></i>景気後退期</span><span><i class="box" style="background:var(--shade2)"></i>危機</span><span><i class="box" style="background:var(--gold);width:8px;border-radius:50%"></i>大事件</span></div>
+  </div>
+  <div class="card"><h2>景気の現在地：${rec?'後退局面':'拡大局面'}</h2>
+   <p>${rec?`景気後退に入って${mo}ヶ月。企業の利益が減りやすい時期。`:`今の拡大局面は${mo}ヶ月目。`}このゲームでは、拡大は平均4年ほど、後退は1年弱続く。チャートで青く塗った期間が過去の後退期で、${recs.length}回あった。</p>
+   <p>景気の波で利益が大きく揺れるのが<b>景気敏感株</b>、あまり揺れないのが<b>ディフェンシブ株</b>。後退期に敏感株を持ち続けるのはきついが、回復期の戻りも大きい。</p>
+   <h3>景気敏感株の1年</h3><div class="holds">${cyc.map(s=>`<button class="lk" data-pick="${s.id}">${s.name}</button> ${pcs(r1(s.id))}`).join('　')}</div>
+   <h3>ディフェンシブ株の1年</h3><div class="holds">${def.map(s=>`<button class="lk" data-pick="${s.id}">${s.name}</button> ${pcs(r1(s.id))}`).join('　')}</div>
+  </div>
+  <div class="card"><h2>為替：1ドル＝${G.fx.toFixed(2)}円</h2>${c2}
+   <p class="desc">円安になると米国株を円で見た価値が増え、円高になると減る。為替は長い目で見ると一定の範囲を行き来しやすい。</p></div>
+  <div class="card" style="grid-column:1/-1"><h2>大きな出来事の年表</h2>
+   ${G.major.length?`<ul class="news">${G.major.slice(0,20).map(m=>`<li class="bad"><span class="tag">${m.tag}・${dstr(m.t)}${m.t<=0?'（開始前）':''}</span><span class="ttl">${esc(m.title)}</span></li>`).join('')}</ul>`:'<p class="desc">まだ大きな事件は起きていない。平穏な相場ほど油断しやすい。</p>'}
+  </div></div>`;
+}
+
+/* ---------- NISA・税金 ---------- */
+function nisaView(pl){
+ const b=nisaBook(pl),lifeUsed=b.T+b.S;
+ const meter=(lb,v,max)=>`<div class="meter"><div class="lb"><span>${lb}</span><span>${man(v)} / ${man(max)}</span></div><div class="bar"><i style="width:${Math.min(100,v/max*100).toFixed(1)}%"></i></div></div>`;
+ const nisaVal=holds(pl).filter(h=>h.a!=='tok').reduce((a,h)=>a+h.sh*pxJ(h.id),0),nisaCost=holds(pl).filter(h=>h.a!=='tok').reduce((a,h)=>a+h.cost,0);
+ const sm=ui.sim,M=+sm.m||0,Y=Math.max(1,Math.min(50,+sm.y||1)),r=(+sm.r||0)/100;
+ const vals=[0],prin=[0];let v=0;for(let k=1;k<=Y*12;k++){v=(v+M)*Math.pow(1+r,1/12);if(k%12===0){vals.push(v);prin.push(M*k)}}
+ const P=M*12*Y,gain=v-P,tax=Math.max(0,gain)*TAX;
+ const c=chart('sim',{label:'積立シミュレーション',h:170,zero:1,series:[{d:vals,c:'var(--up)'},{d:prin,c:'var(--muted)',dash:1}],xl:i=>i%5===0?i+'年':null,
+   tip:i=>`<b>${i}年後</b><br>評価額 ${man(vals[i])}<br>元本 ${man(prin[i])}`});
+ return `<div class="cols2">
+  <div class="card"><h2>${esc(pl.name)}のNISA</h2>
+   ${meter('今年のつみたて投資枠',pl.nisa.yT,NISA_LIM.yT)}
+   ${meter('今年の成長投資枠',pl.nisa.yS,NISA_LIM.yS)}
+   ${meter('生涯の非課税枠（買った金額ベース）',lifeUsed,NISA_LIM.life)}
+   ${meter('うち成長投資枠',b.S,NISA_LIM.lifeS)}
+   ${pl.nisa.pendT+pl.nisa.pendS>0?`<p class="hint">今年NISAで売った ${man(pl.nisa.pendT+pl.nisa.pendS)} ぶんの枠は、来年1月に復活する。</p>`:''}
+   <div class="kv">
+    <div><small>NISAの評価額</small><span class="big">${man(nisaVal)}</span></div>
+    <div><small>NISAの含み損益</small><span class="big">${sgnYen(nisaVal-nisaCost)}</span></div>
+    <div><small>NISAで払わずに済んだ税金</small><span class="big">${man(pl.tax.saved)}</span></div>
+    <div><small>特定口座で払った税金（累計）</small><span class="big">${man(pl.tax.total)}</span></div>
+    <div><small>特定口座の今年の確定損益</small><span class="big">${sgnYen(pl.tax.yrGain)}</span></div>
+   </div>
+  </div>
+  <div class="card"><h2>つみたて設定</h2>
+   <p class="desc">毎月前半に、つみたて投資枠で自動的に買い付ける。現実の積立投資と同じで、高い月は少なく、安い月は多く買える（ドル・コスト平均法）。つみたて投資枠は年120万円なので、合計で月10万円まで。</p>
+   <div class="form">
+    <div><label for="pj">日本株インデックス（円/月）</label><input id="pj" type="number" min="0" step="1000" value="${pl.plan.jpidx}"></div>
+    <div><label for="pu">全米株インデックス（円/月）</label><input id="pu" type="number" min="0" step="1000" value="${pl.plan.usidx}"></div>
+   </div>
+   <div class="trade"><button class="btn dark" id="saveplan">積立を設定する</button></div>
+   <div class="msg ${ui.err?'err':''}" role="status">${ui.view==='nisa'?ui.msg:''}</div>
+  </div>
+  <div class="card"><h2>NISAのしくみ</h2>
+   <p class="desc">2024年に始まった今のNISA。株や投資信託の利益と配当には普通20.315%の税金がかかるが、NISA口座の中なら0円になる。</p>
+   <div class="tbl"><table class="rtbl"><tbody>
+    <tr><th>つみたて投資枠</th><td>年120万円まで。金融庁が選んだ長期・積立・分散向けの投資信託だけ買える</td></tr>
+    <tr><th>成長投資枠</th><td>年240万円まで。個別株や投資信託を買える</td></tr>
+    <tr><th>生涯の上限</th><td>合計1,800万円（うち成長投資枠は1,200万円）。買った金額で数える</td></tr>
+    <tr><th>非課税の期間</th><td>無期限。いつ売っても税金はかからない</td></tr>
+    <tr><th>売ったとき</th><td>売った分の枠は翌年に復活する（すぐには使えない）</td></tr>
+    <tr><th>弱点</th><td>損失を他の利益と相殺できない。特定口座の利益と損失は同じ年の中で相殺できる</td></tr>
+    <tr><th>2027年から</th><td>0〜17歳も「こどもNISA」としてつみたて投資枠を使える予定（年60万円、上限600万円）</td></tr>
+   </tbody></table></div>
+   <p class="hint">2026年10月時点の制度。金や米国株配当の外国税など、一部はゲーム用に簡単にしている。</p>
+  </div>
+  <div class="card"><h2>積立シミュレーター</h2>
+   <p class="desc">毎月同じ額を積み立てて、最後にまとめて売った場合。実際の相場は毎年同じようには増えない。</p>
+   <div class="form">
+    <div><label for="sm">毎月の金額（円）</label><input id="sm" type="number" min="0" step="1000" value="${M}"></div>
+    <div><label for="sy">年数</label><input id="sy" type="number" min="1" max="50" value="${Y}"></div>
+    <div><label for="sr">年利（%）</label><input id="sr" type="number" min="0" max="20" step="0.5" value="${+sm.r}"></div>
+   </div>
+   ${c}
+   <div class="legend"><span><i style="border-color:var(--up)"></i>評価額</span><span><i class="dash" style="border-color:var(--muted)"></i>元本</span></div>
+   <div class="kv">
+    <div><small>元本</small><span class="big">${man(P)}</span></div>
+    <div><small>NISAなら手取り</small><span class="big">${man(v)}</span></div>
+    <div><small>特定口座なら手取り</small><span class="big">${man(v-tax)}</span></div>
+    <div><small>NISAで得する額</small><span class="big up">${man(tax)}</span></div>
+   </div>
+  </div></div>`;
+}
+function bindNisa(pl){
+ document.getElementById('saveplan').onclick=()=>{
+   const j=Math.max(0,Math.round(+document.getElementById('pj').value||0)),u=Math.max(0,Math.round(+document.getElementById('pu').value||0));
+   if(j+u>100000){ui.msg='つみたて投資枠は年120万円なので、合計で月10万円までにしてください。';ui.err=true;render();return}
+   pl.plan={jpidx:j,usidx:u};ui.msg=j+u?`毎月前半に、日本株 ${yen(j)}・全米株 ${yen(u)} を自動で積み立てます。`:'積立を止めました。';ui.err=false;persist(MEID);render()};
+ const simIn=(id,key)=>{const el=document.getElementById(id);el.onchange=()=>{ui.sim[key]=el.value;render()}};
+ simIn('sm','m');simIn('sy','y');simIn('sr','r');
+}
+
+/* ===================== 投資のヒント ===================== */
+const LESSONS=10;
+function wk(id){const n=idxNow();return pxJ(id)/pxJh(id,n-1)-1}
+function tr(id,k=24){const n=idxNow();return pxJ(id)/pxJh(id,Math.max(0,n-k))-1}
+const LK=id=>`<button class="lk" data-pick="${id}">${S[id].name}</button>`;
+function lesson(i,pl){
+ const IND=STOCKS.filter(NONIDX);
+ if(i===0){const up=[...IND].sort((a,b)=>tr(b.id)-tr(a.id)),a=up[0],z=up[up.length-1];
+  return {t:'株価ボードの読み方',
+  body:`<p>見るのは3つ。<b>株価</b>、<b>前回比</b>（2週間前からどれだけ動いたか）、そして<b>1年</b>の小さなグラフ。日本式なので上がりは赤、下がりは青。</p>
+  <div class="ex"><b>今の盤面だと</b>${LK(a.id)}は1年で${pcs(tr(a.id))}。グラフが右肩上がりなら「上昇トレンド」。反対に${LK(z.id)}は${pcs(tr(z.id))}で下降トレンド。</div>
+  <p>2週間の値動きはほとんどが雑音。銘柄を選ぶと、ゲーム開始前の5年分も含めた長期チャートが見られる。</p>`,
+  todo:'銘柄名を押して、チャートの期間を「全期間」にしてみよう。最初から元手を全部使う必要はない。現金を残すのも作戦。'}}
+ if(i===1){let m=null;
+  for(const n of curNews())for(const x of (n.moves||[]))if(!m||Math.abs(x.pct)>Math.abs(m.pct))m={...x,title:n.title};
+  if(!m){const s=[...IND].sort((a,b)=>Math.abs(wk(b.id))-Math.abs(wk(a.id)))[0];m={id:s.id,pct:wk(s.id)}}
+  return {t:'ニュースは「動いた後」に届く',
+  body:`<p>現実でも、ニュースが出た瞬間に株価は動く。読んでから飛びつくと、もう値段が変わった後で買うことになる。</p>
+  <div class="ex"><b>今回の例</b>${LK(m.id)}が${pcs(m.pct)}${m.title?`（${esc(m.title)}）`:''}。考えたいのは「今から買うか」ではなく「この影響は会社の稼ぐ力を変えるか」。</div>
+  <p>噂やアナリストの評価、パニック売りは「気分」の話なので、時間がたつと戻りやすい。関税、規制、ヒット商品、不正のように利益そのものを変える話は戻りにくい。</p>`,
+  todo:'ニュースの「なぜ動いた？」を開いて、気分の話か、稼ぐ力の話かを自分で判定してみよう。'}}
+ if(i===2){const v=value(pl),hs=IND.concat(STOCKS.filter(s=>!NONIDX(s))).map(s=>({id:s.id,w:(holdOf(pl,s.id)?.sh||0)*pxJ(s.id)/v})).filter(x=>x.w>0).sort((a,b)=>b.w-a.w);
+  const me=!hs.length?'まだ何も持っていない。':hs[0].w>.5?`今は資産の${Math.round(hs[0].w*100)}%が${LK(hs[0].id)}。この1社に何か起きると、資産の半分以上が揺れる。`:`一番多い${LK(hs[0].id)}でも資産の${Math.round(hs[0].w*100)}%。偏りすぎてはいない。`;
+  return {t:'分散：1社に全部賭けない',
+  body:`<p>個別株は、不祥事や粉飾が出ると一晩で4割下がることもある。どれだけ有名な会社でも。</p>
+  <div class="ex"><b>値動きの荒さを比べると</b>${LK('nvda')}は「激しい」、${LK('ko')}は「小さめ」。${LK('jpidx')}は日本の会社をまとめて持つので、1社の事件ではほとんど動かない。</div>
+  <div class="ex"><b>${esc(pl.name)}の今</b>${me}</div>`,
+  todo:'「半分はインデックスで土台、残りで気になる個別株に挑戦」のように、守りと攻めを分ける考え方がある。'}}
+ if(i===3){const r=IND.map(s=>({s,r:perNow(s.id)/s.pm})).sort((a,b)=>b.r-a.r),hi=r[0],lo=r[r.length-1];
+  return {t:'割高・割安をPERで見る',
+  body:`<p>株価は「1株利益 × PER」で決まる。PERは「利益の何年分の値段がついているか」で、みんなの期待が大きいほど高くなる。</p>
+  <div class="ex"><b>いちばん割高気味</b>${LK(hi.s.id)}はPER ${perNow(hi.s.id).toFixed(1)}倍で、過去平均（${hi.s.pm}倍）の${hi.r.toFixed(2)}倍。</div>
+  <div class="ex"><b>いちばん割安気味</b>${LK(lo.s.id)}はPER ${perNow(lo.s.id).toFixed(1)}倍で、過去平均（${lo.s.pm}倍）の${lo.r.toFixed(2)}倍。</div>
+  <p>チャートの点線「理論株価の目安」は、1株利益に平均PERをかけた値。株価が点線より大きく上なら期待が先行、下なら悲観が強い。ただし安いのには理由があることも多い（利益が減り続けている、など）。</p>`,
+  todo:'気になる銘柄のチャートで、株価と点線の離れ具合と、「業績の記録」の伸びを見比べよう。'}}
+ if(i===4){const s=[...IND].sort((a,b)=>earnIn(a)-earnIn(b))[0];
+  return {t:'決算は「予想とのズレ」で動く',
+  body:`<p>決算で株価が動くのは、利益が多いからではなく、みんなの予想より多かったか少なかったか。予想通りならあまり動かない。</p>
+  <div class="ex"><b>次に決算が来るのは</b>${LK(s.id)}で${earnIn(s)===1?'次のターン':nextEarn(s)}。好決算でも、期待で先に買われていると発表と同時に売られる（材料出尽くし）。このゲームでも起きる。</div>
+  <p>すごろく盤の「決」のマスが決算シーズン。銘柄カルテの「業績の記録」で、過去の決算が予想を上回ったか（赤）下回ったか（青）が見られる。</p>`,
+  todo:'決算をまたいで持つなら、外れても耐えられる量にとどめる。'}}
+ if(i===5){const dips=IND.filter(s=>tr(s.id)>.08&&wk(s.id)<-.02).sort((a,b)=>wk(a.id)-wk(b.id)),knives=IND.filter(s=>tr(s.id)<-.15).sort((a,b)=>tr(a.id)-tr(b.id));
+  return {t:'押し目と「落ちてくるナイフ」',
+  body:`<p>よく使われる経験則がある（当たる保証はない）。上昇トレンドの途中で一時的に下げたところは<b>押し目</b>と呼ばれ、買い候補になる。下がり続けている株を「安くなったから」と買うのは<b>落ちてくるナイフをつかむ</b>と言われ、さらに下がりやすい。</p>
+  <div class="ex"><b>押し目の形</b>${dips.length?`${LK(dips[0].id)}は1年で${pcs(tr(dips[0].id))}の上昇中、今回は${pcs(wk(dips[0].id))}。`:'今の盤面にはきれいな押し目がない。条件がそろわないときは待つのも判断。'}</div>
+  <div class="ex"><b>ナイフの形</b>${knives.length?`${LK(knives[0].id)}は1年で${pcs(tr(knives[0].id))}。業績の記録で利益が減り続けていないか確認してから。`:'大きく下げ続けている銘柄は今はない。'}</div>`,
+  todo:'買う前に「なぜ今この値段なのか」を一言で説明できるか確かめる。説明できなければ見送り。'}}
+ if(i===6){const hy=[...IND].sort((a,b)=>b.y-a.y).slice(0,3);
+  return {t:'配当：持っているだけでもらえる現金',
+  body:`<p>配当は株を持っている人に会社が払うお金。日本株は3月・9月、米国株は3・6・9・12月の後半に確定する（すごろく盤の「配」のマス）。</p>
+  <div class="ex"><b>利回りが高いのは</b>${hy.map(s=>`${LK(s.id)} ${(s.y*100).toFixed(1)}%`).join('、')}。利回り3%なら、300万円で年に約9万円。特定口座だとそこから約1.8万円が税金で引かれる。</div>
+  <p>権利が確定すると、配当の分だけ株価が下がる（権利落ち）。直前に買ってすぐ売っても得はしない。長く持つ人へのごほうび。</p>`,
+  todo:'長く持つ候補は、配当利回りと値動きの荒さを両方見て選ぶ。'}}
+ if(i===7){const usd=G.st.aapl.p,y0=usd*G.fx,y1=usd*(G.fx-10);
+  return {t:'為替も損益を動かす',
+  body:`<p>米国株と金はドルで値段がつく。株価が変わらなくても、円安なら円で見た資産は増え、円高なら減る。</p>
+  <div class="ex"><b>計算してみると</b>${LK('aapl')}は$${usd.toFixed(2)}、今の1ドル＝${G.fx.toFixed(1)}円で${fp(y0)}円。10円円高になると、株価が同じでも${fp(y1)}円（${pcs(y1/y0-1)}）。</div>`,
+  todo:'「相場の歴史」タブで、ドル円の長い動きを見てみよう。日本株と米国株を両方持つと、為替の影響が和らぎやすい。'}}
+ if(i===8){return {t:'NISA：利益に税金がかからない口座',
+  body:`<p>普通の口座（特定口座）では、売って出た利益と配当に20.315%の税金がかかる。10万円もうけたら約2万円が引かれる。NISAの口座の中なら0円。</p>
+  <div class="ex"><b>${esc(pl.name)}の今</b>特定口座で払った税金は累計${yen(pl.tax.total)}、NISAで払わずに済んだ税金は${yen(pl.tax.saved)}。</div>
+  <p>ただしNISAには年間と生涯の上限があり、損失が出ても他の利益と相殺できない。値動きの激しい株で大損するとNISAの得が消える。</p>`,
+  todo:'銘柄カルテの口座ボタンで「NISA成長投資枠」を選んで買える。「NISA・税金」タブでは毎月の自動積立も設定できる。'}}
+ const loss=holds(pl).map(h=>({id:h.id,r:h.sh*pxJ(h.id)/h.cost-1})).sort((a,b)=>a.r-b.r);
+ return {t:'下がったときにどうするか',
+  body:`<p>一番損をしやすいのは、暴落でパニックになって底で売ること（狼狽売り）。2008年も2020年も、相場はその後に回復した。判断の基準は「買った理由がまだ生きているか」。</p>
+  <div class="ex"><b>${esc(pl.name)}の今</b>${loss.length&&loss[0].r<0?`${LK(loss[0].id)}が${pcs(loss[0].r)}の含み損。利益（業績の記録）は減っている？ 減っていないなら気分の下げかもしれない。`:'今は含み損の銘柄はない。下がる前に「−15%になったら理由を見直す」のようなルールを決めておくと、いざというとき迷わない。'}</div>`,
+  todo:'ヒントはこれで最後。ここからは自分の判断で。ヘッダーの「ヒント」でいつでも見返せる。'};
+}
+function coachCard(pl){
+ const auto=ROOM.coach&&G.t-ME.joinT<LESSONS&&!ME.coachOff;
+ if(!auto&&!ui.coachOpen)return '';
+ const i=ui.lesson??Math.min(Math.max(G.t-ME.joinT,0),LESSONS-1),L=lesson(i,pl);
+ return `<div class="card coach" aria-label="投資のヒント"><span class="step">ヒント ${i+1}/${LESSONS}</span><h2>${L.t}</h2>${L.body}<p><b>やってみよう：</b>${L.todo}</p>
+ <div class="coachbar"><button class="btn ghost" data-cl="-1" ${i?'':'disabled'}>前のヒント</button><button class="btn ghost" data-cl="1" ${i<LESSONS-1?'':'disabled'}>次のヒント</button><span class="spacer"></span><button class="linkbtn" id="coachx">ヒントを閉じる</button></div></div>`;
+}
+
+/* ===================== 起動 ===================== */
+(function boot(){
+ const h=(location.hash||'').slice(1).toUpperCase();
+ const s=h&&sessions().find(x=>x.code===h);
+ if(s&&(FIREBASE_CONFIG||window.__TEST_BUS__))resumeOnline(s).catch(e=>{ui.lobbyMsg=e.message;render()});
+ else render();
+})();
+
+</script>
+</body>
+</html>
